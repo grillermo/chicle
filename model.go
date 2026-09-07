@@ -49,6 +49,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "down", "j":
+			return m.move(1), nil
+		case "up", "k":
+			return m.move(-1), nil
 		case "q", "ctrl+c", "esc":
 			m.quit = true
 			return m, tea.Quit
