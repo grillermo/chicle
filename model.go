@@ -26,7 +26,7 @@ type Model struct {
 func New(cfg Config) Model {
 	m := Model{cfg: cfg}
 	m.rows = append([]Row(nil), cfg.Rows...)
-	return m
+	return m.normaliseLocks()
 }
 
 func (m Model) Init() tea.Cmd { return nil }
@@ -68,6 +68,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if msg.Type == tea.KeySpace {
+				// Space is the tick command even while filtering — a
+				// narrowed-down list is exactly when you want to tick the one
+				// row you searched for, not type a literal space.
+				if m.cfg.MultiSelect {
+					return m.toggleCursor(), nil
+				}
 				return m.insertRune(' '), nil
 			}
 			next, quit := m.updateFiltering(s)
@@ -96,6 +102,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			m.quit = true
 			return m, tea.Quit
+		case " ", "space", "x":
+			if m.cfg.MultiSelect {
+				return m.toggleCursor(), nil
+			}
+		case "a":
+			if m.cfg.MultiSelect {
+				return m.setAll(true), nil
+			}
+		case "n":
+			if m.cfg.MultiSelect {
+				return m.setAll(false), nil
+			}
 		}
 	}
 	return m, nil
