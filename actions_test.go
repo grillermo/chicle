@@ -1,6 +1,11 @@
 package chicle
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+var errBoom = errors.New("boom")
 
 // acted records what an action was handed, so tests can assert on it.
 type acted struct {
@@ -246,4 +251,61 @@ func TestNavigationIsFrozenWhileConfirming(t *testing.T) {
 	if got := m.CursorRow().Key; got != "a" {
 		t.Fatalf("cursor moved to %q while a prompt was open, want a", got)
 	}
+}
+
+func TestReloadRefreshesTheRowsAfterAnUnfinishedAction(t *testing.T) {
+	var a acted
+	m := New(Config{
+		Columns: []Column{{Title: "N"}},
+		Rows:    rows("a", "b"),
+		Actions: []Action{{Label: "Go", Run: a.run(Outcome{Status: "ok"})}},
+		Reload:  func() ([]Row, error) { return rows("x", "y", "z"), nil },
+	})
+	m = press(t, m, "enter")
+	eq(t, keys(m), []string{"x", "y", "z"})
+}
+
+func TestReloadKeepsTheFilter(t *testing.T) {
+	m := New(Config{
+		Columns: []Column{{Title: "N"}},
+		Rows:    rows("alpha", "beta"),
+		Actions: []Action{{Label: "Go", Run: (&acted{}).run(Outcome{Status: "ok"})}},
+		Reload:  func() ([]Row, error) { return rows("alpha", "beta", "alpine"), nil },
+	})
+	m = press(t, m, "/", "alp", "enter")
+	eq(t, keys(m), []string{"alpha", "alpine"})
+}
+
+func TestReloadFailureIsAppendedToTheStatus(t *testing.T) {
+	m := New(Config{
+		Columns: []Column{{Title: "N"}},
+		Rows:    rows("a"),
+		Actions: []Action{{Label: "Go", Run: (&acted{}).run(Outcome{Status: "removed a"})}},
+		Reload:  func() ([]Row, error) { return nil, errBoom },
+	})
+	m = press(t, m, "enter")
+	if m.status != "removed a; reloading failed: boom" {
+		t.Fatalf("status %q, want both the action's message and the failure", m.status)
+	}
+}
+
+func TestReloadingToNothingEndsThePicker(t *testing.T) {
+	// Acting on the last row leaves nothing to act on, so staying up would
+	// strand the user on an empty screen.
+	m := New(Config{
+		Columns: []Column{{Title: "N"}},
+		Rows:    rows("a"),
+		Actions: []Action{{Label: "Go", Run: (&acted{}).run(Outcome{Status: "removed"})}},
+		Reload:  func() ([]Row, error) { return nil, nil },
+	})
+	m = press(t, m, "enter")
+	if !m.quit {
+		t.Fatal("picker stayed up with no rows left")
+	}
+}
+
+func TestNoReloadHookLeavesTheRowsAlone(t *testing.T) {
+	m := withActions(Action{Label: "Go", Run: (&acted{}).run(Outcome{Status: "ok"})})
+	m = press(t, m, "enter")
+	eq(t, keys(m), []string{"a", "b", "c"})
 }

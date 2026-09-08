@@ -84,5 +84,26 @@ func (m Model) runAction(action Action) (Model, bool) {
 		m.quit = true
 		return m, true
 	}
+
+	if m.cfg.Reload != nil {
+		rows, err := m.cfg.Reload()
+		if err != nil {
+			// Append rather than replace: the action's own message still
+			// matters even though the refresh failed.
+			if m.status != "" {
+				m.status += "; "
+			}
+			m.status += "reloading failed: " + err.Error()
+			return m, false
+		}
+		m.rows = rows
+		m = m.normaliseLocks().clampCursor().scrollToCursor()
+	}
+
+	// Acting on the last row leaves nothing to act on.
+	if len(m.rows) == 0 {
+		m.quit = true
+		return m, true
+	}
 	return m, false
 }
