@@ -73,11 +73,11 @@ func TestFilteringNeverChangesWhatIsTicked(t *testing.T) {
 	// The bug this guards: narrowing the view must not drop ticks for rows the
 	// filter is hiding, or a filter silently unselects things.
 	m := multi(rows("alpha", "beta", "gamma")...)
-	m = press(t, m, "space")           // tick alpha
-	m = press(t, m, "/", "gam")        // hide it
+	m = press(t, m, "space")    // tick alpha
+	m = press(t, m, "/", "gam") // hide it
 	eq(t, ticked(m), []string{"alpha"})
-	m = press(t, m, "space")           // also tick gamma
-	m = press(t, m, "esc")             // unfilter
+	m = press(t, m, "space") // also tick gamma
+	m = press(t, m, "esc")   // unfilter
 	eq(t, ticked(m), []string{"alpha", "gamma"})
 }
 
