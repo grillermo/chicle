@@ -34,6 +34,9 @@ func (m Model) Result() string { return m.result }
 // visibleRows is the rows the filter lets through, in display order.
 func (m Model) visibleRows() []Row { return m.rows }
 
+// showQuery reports whether the filter line takes up a screen row.
+func (m Model) showQuery() bool { return false }
+
 // CursorRow is the highlighted row, or a zero Row when nothing is visible.
 func (m Model) CursorRow() Row {
 	vis := m.visibleRows()
@@ -47,12 +50,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		return m.scrollToCursor(), nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "down", "j":
-			return m.move(1), nil
+			return m.move(1).scrollToCursor(), nil
 		case "up", "k":
-			return m.move(-1), nil
+			return m.move(-1).scrollToCursor(), nil
 		case "q", "ctrl+c", "esc":
 			m.quit = true
 			return m, tea.Quit
