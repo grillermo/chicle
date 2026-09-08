@@ -38,8 +38,9 @@ func (m Model) Result() string { return m.result }
 // visibleRows is the rows the filter lets through, in display order.
 func (m Model) visibleRows() []Row { return filtered(m.rows, m.query) }
 
-// showQuery reports whether the filter line takes up a screen row.
-func (m Model) showQuery() bool { return false }
+// showQuery keeps the query line on screen while it holds a filter, so it is
+// never a mystery why rows are missing.
+func (m Model) showQuery() bool { return m.filtering || len(m.query) > 0 }
 
 // CursorRow is the highlighted row, or a zero Row when nothing is visible.
 func (m Model) CursorRow() Row {
@@ -56,12 +57,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		return m.scrollToCursor(), nil
 	case tea.KeyMsg:
-		switch msg.String() {
+		s := msg.String()
+		if m.filtering {
+			// Printable text goes to the query; everything else is an editing
+			// key. Runes are checked first so "q" and "/" type normally here.
+			if msg.Type == tea.KeyRunes {
+				for _, r := range msg.Runes {
+					m = m.insertRune(r)
+				}
+				return m, nil
+			}
+			if msg.Type == tea.KeySpace {
+				return m.insertRune(' '), nil
+			}
+			next, quit := m.updateFiltering(s)
+			if quit {
+				return next, tea.Quit
+			}
+			return next, nil
+		}
+		switch s {
 		case "down", "j":
 			return m.move(1).scrollToCursor(), nil
 		case "up", "k":
 			return m.move(-1).scrollToCursor(), nil
-		case "q", "ctrl+c", "esc":
+		case "/":
+			m.filtering = true
+			m.qpos = len(m.query)
+			return m, nil
+		case "esc":
+			// A filter on screen is cleared first: quitting and losing the
+			// query to the same keystroke is never what was meant.
+			if len(m.query) > 0 {
+				return m.clearFilter(), nil
+			}
+			m.quit = true
+			return m, tea.Quit
+		case "q", "ctrl+c":
 			m.quit = true
 			return m, tea.Quit
 		}
