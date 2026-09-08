@@ -22,7 +22,7 @@ func (m Model) visibleHeight() int {
 	if m.height <= 0 {
 		return len(m.visibleRows())
 	}
-	h := m.height - m.chrome()
+	h := m.height - m.chrome() - m.headingLines()
 	if h < 1 {
 		return 1
 	}
@@ -69,4 +69,33 @@ func (m Model) scrollToCursor() Model {
 func (m Model) offscreen() (above, below int) {
 	start, end := m.window()
 	return start, len(m.visibleRows()) - end
+}
+
+// sections is the distinct Section values among the visible rows, in display
+// order.
+func (m Model) sections() []string {
+	var out []string
+	prev := ""
+	for i, r := range m.visibleRows() {
+		if i == 0 || r.Section != prev {
+			out = append(out, r.Section)
+			prev = r.Section
+		}
+	}
+	return out
+}
+
+// headingLines is the screen height the section headings take: one line each,
+// plus a blank separator before every heading but the first. A list with only
+// one section draws no headings at all — a single heading tells you nothing
+// you cannot see.
+func (m Model) headingLines() int {
+	secs := m.sections()
+	if len(secs) < 2 {
+		return 0
+	}
+	if len(secs) == 1 && secs[0] == "" {
+		return 0
+	}
+	return len(secs)*2 - 1
 }
