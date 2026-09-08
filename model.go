@@ -22,6 +22,10 @@ type Model struct {
 
 	button int    // focused action
 	status string // message under the action row
+
+	confirming bool   // the prompt replaces the action row
+	confirmYes bool   // focus sits on No until the user moves it
+	question   string // text of the pending prompt
 }
 
 // New builds a Model from cfg. Rows are copied, so the caller's slice can be
@@ -61,6 +65,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.scrollToCursor(), nil
 	case tea.KeyMsg:
 		s := msg.String()
+		if m.confirming {
+			next, done := m.updateConfirm(s)
+			if done {
+				return next, tea.Quit
+			}
+			return next, nil
+		}
 		if m.filtering {
 			// Printable text goes to the query; everything else is an editing
 			// key. Runes are checked first so "q" and "/" type normally here.
