@@ -15,6 +15,10 @@ type Model struct {
 
 	quit   bool
 	result string
+
+	filtering bool   // typing goes to the query instead of the list
+	query     []rune // the filter text, matched against every cell
+	qpos      int    // cursor position within query
 }
 
 // New builds a Model from cfg. Rows are copied, so the caller's slice can be
@@ -32,7 +36,7 @@ func (m Model) Init() tea.Cmd { return nil }
 func (m Model) Result() string { return m.result }
 
 // visibleRows is the rows the filter lets through, in display order.
-func (m Model) visibleRows() []Row { return m.rows }
+func (m Model) visibleRows() []Row { return filtered(m.rows, m.query) }
 
 // showQuery reports whether the filter line takes up a screen row.
 func (m Model) showQuery() bool { return false }
