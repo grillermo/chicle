@@ -61,7 +61,13 @@ type Action struct {
 	// be focused first. Leave empty for actions only reachable via
 	// left/right and Enter. If more than one Action shares a Key, the last
 	// one in the slice wins — chicle does not validate this at New or Run
-	// time, consistent with the rest of Config.
+	// time, consistent with the rest of Config. Avoid keys chicle already
+	// binds (up/down/left/right/enter/esc/q/ctrl+c/j/k, and space/a/n under
+	// MultiSelect) — Key shadows them for this action rather than erroring.
+	// Pressing Key also moves button focus to this action so Confirm/Run
+	// behave exactly as Enter would; if a Confirm prompt is then cancelled,
+	// focus stays on this action rather than reverting to what was focused
+	// before the keypress.
 	Key string
 	// Confirm, when set, is asked before Run. Returning "" skips the prompt.
 	Confirm func(Selection) string
