@@ -36,7 +36,7 @@ func New(cfg Config) Model {
 	return m.normaliseLocks()
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd { return waitForUpdate(m.cfg.Updates) }
 
 // Result is the picker's answer: the string an Action returned, or "" if the
 // user quit without choosing.
@@ -63,6 +63,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m.scrollToCursor(), nil
+	case rowsMsg:
+		if msg.closed {
+			return m, nil // stop watching; re-issuing would spin on a closed channel
+		}
+		return m.applyUpdate(msg.rows), waitForUpdate(m.cfg.Updates)
 	case tea.KeyMsg:
 		s := msg.String()
 		if m.confirming {
