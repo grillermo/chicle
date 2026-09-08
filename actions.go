@@ -17,6 +17,18 @@ func (m Model) moveButton(delta int) Model {
 	return m
 }
 
+// keyedAction reports the index of the action whose Key matches s, if any.
+// When more than one Action shares a Key, the last one in the slice wins.
+func (m Model) keyedAction(s string) (int, bool) {
+	found := -1
+	for i, a := range m.cfg.Actions {
+		if a.Key != "" && a.Key == s {
+			found = i
+		}
+	}
+	return found, found >= 0
+}
+
 // activate fires the focused action, or — on a list with no actions at all —
 // returns the cursor row's Key, which is the whole API for a plain picker.
 func (m Model) activate() (Model, bool) {

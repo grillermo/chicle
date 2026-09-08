@@ -309,3 +309,73 @@ func TestNoReloadHookLeavesTheRowsAlone(t *testing.T) {
 	m = press(t, m, "enter")
 	eq(t, keys(m), []string{"a", "b", "c"})
 }
+
+func TestKeyedActionFiresWithoutFocus(t *testing.T) {
+	var open, del acted
+	m := withActions(
+		Action{Label: "Open", Run: open.run(Outcome{Done: true})},
+		Action{Label: "Delete", Key: "f2", Run: del.run(Outcome{Done: true})},
+	)
+	// The focused button is still "Open" (button 0); f2 must fire Delete
+	// anyway, with no left/right needed first.
+	m = press(t, m, "f2")
+	if len(del.calls) != 1 || len(open.calls) != 0 {
+		t.Fatalf("ran open=%d delete=%d, want open=0 delete=1", len(open.calls), len(del.calls))
+	}
+	if got := m.Result(); got != "" {
+		t.Fatalf("result %q, want empty (Done was set but Run returned no Result)", got)
+	}
+	if !m.quit {
+		t.Fatal("the keyed action did not finish the picker")
+	}
+}
+
+func TestKeyedActionStillGoesThroughConfirm(t *testing.T) {
+	var a acted
+	m := withActions(Action{
+		Label:   "Delete",
+		Key:     "f2",
+		Confirm: func(s Selection) string { return "Delete " + s.Cursor.Key + "?" },
+		Run:     a.run(Outcome{Done: true, Result: "deleted"}),
+	})
+	m = press(t, m, "f2")
+	if !m.confirming {
+		t.Fatal("no confirm prompt opened for the keyed action")
+	}
+	if len(a.calls) != 0 {
+		t.Fatal("the action ran before it was confirmed")
+	}
+	m = press(t, m, "left", "enter")
+	if len(a.calls) != 1 {
+		t.Fatalf("action ran %d times after confirming, want 1", len(a.calls))
+	}
+}
+
+func TestUnmappedKeyFallsThroughUnchanged(t *testing.T) {
+	var a acted
+	m := withActions(Action{Label: "Go", Key: "f2", Run: a.run(Outcome{Done: true})})
+	// f9 matches no action's Key and is not otherwise bound; it must not be
+	// swallowed into firing the only action or otherwise doing something odd.
+	m = press(t, m, "f9")
+	if len(a.calls) != 0 {
+		t.Fatal("an unmapped key fired an action")
+	}
+	if m.quit {
+		t.Fatal("an unmapped key quit the picker")
+	}
+}
+
+// Two actions sharing a Key is a caller mistake chicle does not validate
+// anywhere else (Config has no other checks in New or Run), so this is
+// documented as last-wins rather than a panic, to stay consistent.
+func TestTwoActionsSharingAKeyIsLastWins(t *testing.T) {
+	var first, second acted
+	m := withActions(
+		Action{Label: "First", Key: "f2", Run: first.run(Outcome{Done: true})},
+		Action{Label: "Second", Key: "f2", Run: second.run(Outcome{Done: true})},
+	)
+	m = press(t, m, "f2")
+	if len(first.calls) != 0 || len(second.calls) != 1 {
+		t.Fatalf("ran first=%d second=%d, want first=0 second=1 (last Key match wins)", len(first.calls), len(second.calls))
+	}
+}

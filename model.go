@@ -101,6 +101,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return next, nil
 		}
+		if i, ok := m.keyedAction(s); ok {
+			m.button = i
+			next, done := m.activate()
+			if done {
+				return next, tea.Quit
+			}
+			return next, nil
+		}
 		switch s {
 		case "down", "j":
 			return m.move(1).scrollToCursor(), nil

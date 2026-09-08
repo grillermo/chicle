@@ -56,6 +56,13 @@ type Outcome struct {
 // Action is one button in the row under the list.
 type Action struct {
 	Label string
+	// Key, when set, fires this action immediately on that key (bubbletea's
+	// tea.KeyMsg.String() form, e.g. "f2"), without requiring the action to
+	// be focused first. Leave empty for actions only reachable via
+	// left/right and Enter. If more than one Action shares a Key, the last
+	// one in the slice wins — chicle does not validate this at New or Run
+	// time, consistent with the rest of Config.
+	Key string
 	// Confirm, when set, is asked before Run. Returning "" skips the prompt.
 	Confirm func(Selection) string
 	// Run acts on the selection. A nil Run makes a bare "cancel" button that
