@@ -122,6 +122,9 @@ func (m Model) updateFiltering(k string) (Model, bool) {
 		m.query = nil
 		m.qpos = 0
 		return m.queryChanged(), false
+	case "enter":
+		next, _ := m.activate()
+		return next, next.quit
 	}
 	return m, false
 }

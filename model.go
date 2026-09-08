@@ -19,6 +19,9 @@ type Model struct {
 	filtering bool   // typing goes to the query instead of the list
 	query     []rune // the filter text, matched against every cell
 	qpos      int    // cursor position within query
+
+	button int    // focused action
+	status string // message under the action row
 }
 
 // New builds a Model from cfg. Rows are copied, so the caller's slice can be
@@ -102,6 +105,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			m.quit = true
 			return m, tea.Quit
+		case "left":
+			return m.moveButton(-1), nil
+		case "right":
+			return m.moveButton(1), nil
+		case "enter":
+			next, done := m.activate()
+			if done {
+				return next, tea.Quit
+			}
+			return next, nil
 		case " ", "space", "x":
 			if m.cfg.MultiSelect {
 				return m.toggleCursor(), nil
