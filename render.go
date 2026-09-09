@@ -7,12 +7,39 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	titleStyle    = lipgloss.NewStyle().Bold(true)
-	headerStyle   = lipgloss.NewStyle().Bold(true)
-	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
-	dimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-)
+// styles carries the lipgloss styles for one Model. They hang off the Model
+// rather than the package because a lipgloss style is bound to the renderer
+// that made it, and the default renderer decides how much color it may emit by
+// looking at os.Stdout — while chicle draws to /dev/tty. Under `sel=$(picker)`,
+// the case that /dev/tty output exists to serve, stdout is a pipe: the default
+// renderer sees no terminal, reports no color support, and every style renders
+// as plain text. Run rebinds these to the tty so the highlight survives being
+// captured.
+type styles struct {
+	title    lipgloss.Style
+	header   lipgloss.Style
+	selected lipgloss.Style
+	dim      lipgloss.Style
+	plain    lipgloss.Style // unstyled, for width-clamping only
+}
+
+func newStyles(r *lipgloss.Renderer) styles {
+	return styles{
+		title:    r.NewStyle().Bold(true),
+		header:   r.NewStyle().Bold(true),
+		selected: r.NewStyle().Bold(true).Foreground(lipgloss.Color("212")),
+		dim:      r.NewStyle().Foreground(lipgloss.Color("241")),
+		plain:    r.NewStyle(),
+	}
+}
+
+// withRenderer returns a copy drawing with r. Run calls it with a renderer
+// bound to the terminal, which is the only place the real color profile is
+// visible.
+func (m Model) withRenderer(r *lipgloss.Renderer) Model {
+	m.styles = newStyles(r)
+	return m
+}
 
 // truncate cuts s to width display cells. It counts runes rather than bytes:
 // slicing a multi-byte string mid-rune emits invalid UTF-8, which terminals
@@ -50,18 +77,18 @@ func (m Model) clamp(s string) string {
 	if w <= 0 {
 		return s
 	}
-	return lipgloss.NewStyle().MaxWidth(w).Render(s)
+	return m.styles.plain.MaxWidth(w).Render(s)
 }
 
-func button(label string, focused bool) string {
+func (m Model) drawButton(label string, focused bool) string {
 	if focused {
-		return selectedStyle.Render("[ " + label + " ]")
+		return m.styles.selected.Render("[ " + label + " ]")
 	}
 	return "[ " + label + " ]"
 }
 
 func (m Model) queryLine() string {
-	return dimStyle.Render("/ ") + string(m.query)
+	return m.styles.dim.Render("/ ") + string(m.query)
 }
 
 // hint is the key legend. It changes with the mode: there is no point offering
@@ -85,7 +112,7 @@ func (m Model) View() string {
 	var b strings.Builder
 
 	if m.cfg.Title != "" {
-		b.WriteString(titleStyle.Render(m.cfg.Title) + "\n")
+		b.WriteString(m.styles.title.Render(m.cfg.Title) + "\n")
 	}
 	if m.showQuery() {
 		b.WriteString(m.clamp(m.queryLine()) + "\n")
@@ -93,29 +120,29 @@ func (m Model) View() string {
 
 	switch {
 	case len(m.rows) == 0:
-		b.WriteString(dimStyle.Render("Nothing to show.") + "\n")
+		b.WriteString(m.styles.dim.Render("Nothing to show.") + "\n")
 	case len(m.visibleRows()) == 0:
-		b.WriteString(dimStyle.Render("No rows match the filter.") + "\n")
+		b.WriteString(m.styles.dim.Render("No rows match the filter.") + "\n")
 	default:
-		b.WriteString(headerStyle.Render(m.clamp(m.pad(m.columnTitles()))) + "\n")
+		b.WriteString(m.styles.header.Render(m.clamp(m.pad(m.columnTitles()))) + "\n")
 		b.WriteString(m.body())
 	}
 
 	b.WriteString("\n")
 	if m.confirming {
 		b.WriteString(m.clamp(fmt.Sprintf("%s  %s  %s",
-			m.question, button("Yes", m.confirmYes), button("No", !m.confirmYes))) + "\n")
+			m.question, m.drawButton("Yes", m.confirmYes), m.drawButton("No", !m.confirmYes))) + "\n")
 	} else if len(m.cfg.Actions) > 0 {
 		var row []string
 		for i, a := range m.cfg.Actions {
-			row = append(row, button(a.Label, i == m.button))
+			row = append(row, m.drawButton(a.Label, i == m.button))
 		}
 		b.WriteString(m.clamp(strings.Join(row, "  ")) + "\n")
 	}
 	if m.status != "" {
 		b.WriteString(m.clamp(m.status) + "\n")
 	}
-	b.WriteString(dimStyle.Render(m.clamp(m.hint())))
+	b.WriteString(m.styles.dim.Render(m.clamp(m.hint())))
 	return b.String()
 }
 
@@ -137,7 +164,7 @@ func (m Model) body() string {
 	withHeadings := m.headingLines() > 0
 
 	if above > 0 {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d more above", above)) + "\n")
+		b.WriteString(m.styles.dim.Render(fmt.Sprintf("  %d more above", above)) + "\n")
 	}
 
 	section := ""
@@ -147,7 +174,7 @@ func (m Model) body() string {
 			if i > start {
 				b.WriteString("\n")
 			}
-			b.WriteString(dimStyle.Render("  "+r.Section) + "\n")
+			b.WriteString(m.styles.dim.Render("  "+r.Section) + "\n")
 		}
 		section = r.Section
 
@@ -160,7 +187,7 @@ func (m Model) body() string {
 			line = box + " " + line
 		}
 		if i == m.cursor {
-			line = selectedStyle.Render("> " + line)
+			line = m.styles.selected.Render("> " + line)
 		} else {
 			line = "  " + line
 		}
@@ -168,7 +195,7 @@ func (m Model) body() string {
 	}
 
 	if below > 0 {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d more below", below)) + "\n")
+		b.WriteString(m.styles.dim.Render(fmt.Sprintf("  %d more below", below)) + "\n")
 	}
 	return b.String()
 }

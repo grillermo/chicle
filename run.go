@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // openTTY opens the controlling terminal. The UI draws here rather than to
@@ -37,7 +38,12 @@ func runOn(cfg Config, tty *os.File, openErr error) (string, error) {
 		return "", openErr
 	}
 
-	p := tea.NewProgram(New(cfg),
+	// Style against the terminal we draw to, not os.Stdout: a picker run as
+	// `sel=$(picker)` has a pipe on stdout, and lipgloss's default renderer
+	// would read that as "no color" and flatten every highlight.
+	m := New(cfg).withRenderer(lipgloss.NewRenderer(tty))
+
+	p := tea.NewProgram(m,
 		tea.WithInput(tty),
 		tea.WithOutput(tty),
 		tea.WithAltScreen(),

@@ -1,6 +1,9 @@
 package chicle
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Model is the list. It implements tea.Model and holds no terminal state, so
 // tests drive it by calling Update directly.
@@ -26,12 +29,18 @@ type Model struct {
 	confirming bool   // the prompt replaces the action row
 	confirmYes bool   // focus sits on No until the user moves it
 	question   string // text of the pending prompt
+
+	styles styles // rebound to the terminal by Run; see render.go
 }
 
 // New builds a Model from cfg. Rows are copied, so the caller's slice can be
 // reused.
+//
+// Styles start on lipgloss's default renderer, which judges color support from
+// os.Stdout. Run replaces them with a renderer bound to the terminal it draws
+// to, so a picker whose stdout is captured still gets its highlights.
 func New(cfg Config) Model {
-	m := Model{cfg: cfg}
+	m := Model{cfg: cfg, styles: newStyles(lipgloss.DefaultRenderer())}
 	m.rows = append([]Row(nil), cfg.Rows...)
 	return m.normaliseLocks()
 }
