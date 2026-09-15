@@ -17,7 +17,7 @@ func key(s string) tea.KeyMsg {
 		"space": tea.KeySpace, "backspace": tea.KeyBackspace,
 		"ctrl+c": tea.KeyCtrlC, "ctrl+w": tea.KeyCtrlW,
 		"ctrl+a": tea.KeyCtrlA, "ctrl+e": tea.KeyCtrlE,
-		"ctrl+u": tea.KeyCtrlU,
+		"ctrl+u": tea.KeyCtrlU, "ctrl+n": tea.KeyCtrlN,
 		"f2":     tea.KeyF2, "f9": tea.KeyF9,
 	}
 	if t, ok := named[s]; ok {
@@ -37,7 +37,7 @@ func press(t *testing.T, m Model, keys ...string) Model {
 			"up": true, "down": true, "left": true, "right": true,
 			"enter": true, "esc": true, "tab": true, "space": true,
 			"backspace": true, "ctrl+c": true, "ctrl+w": true,
-			"ctrl+a": true, "ctrl+e": true, "ctrl+u": true,
+			"ctrl+a": true, "ctrl+e": true, "ctrl+u": true, "ctrl+n": true,
 			"f2": true, "f9": true,
 		}[k]; !named && len([]rune(k)) > 1 {
 			msgs = nil

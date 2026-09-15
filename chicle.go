@@ -39,6 +39,11 @@ type Row struct {
 type Selection struct {
 	Cursor Row
 	Ticked []Row
+
+	// Filter is the query the list is narrowed by, empty when it is not
+	// narrowed at all. An action can act on it rather than on a row, which is
+	// how a list offers "none of these, use what I typed".
+	Filter string
 }
 
 // Outcome is what an Action reports back.
@@ -69,6 +74,19 @@ type Action struct {
 	// focus stays on this action rather than reverting to what was focused
 	// before the keypress.
 	Key string
+	// OnEmpty lets the action run when the filter matches nothing. Off by
+	// default, because an action normally acts on the cursor row and there is
+	// no cursor row to act on. Set it for an action that acts on
+	// Selection.Filter instead: "nothing matched" is precisely when the user
+	// wants to do something with what they typed.
+	OnEmpty bool
+	// Show decides whether the action is offered at all. Nil means always.
+	// A false Show hides the button rather than greying it out, and takes its
+	// Key with it: an action that cannot be reached by Enter should not be
+	// reachable by hotkey either. Focus never rests on a hidden action -- it
+	// slides to the nearest shown one -- so an action can appear and disappear
+	// as the filter changes without stranding the keyboard.
+	Show func(Selection) bool
 	// Confirm, when set, is asked before Run. Returning "" skips the prompt.
 	Confirm func(Selection) string
 	// Run acts on the selection. A nil Run makes a bare "cancel" button that
@@ -83,6 +101,13 @@ type Config struct {
 	Title   string
 	Columns []Column
 	Rows    []Row
+
+	// Filter pre-fills the query, as though the user had pressed "/" and typed
+	// it: the list opens narrowed, with the keyboard in the query so it can be
+	// refined, and Enter fires the focused action on whatever is left. Use it
+	// to open on a guess -- the caller had a name in mind and wants it
+	// confirmed rather than assumed.
+	Filter string
 
 	// Actions is the button row under the list. When empty, chicle draws no
 	// button row and Enter returns the cursor row's Key directly — which is

@@ -91,6 +91,19 @@ func (m Model) queryLine() string {
 	return m.styles.dim.Render("/ ") + string(m.query)
 }
 
+// keyHints advertises the shown actions that carry a hotkey. It matters most
+// while filtering: left and right belong to the query there, so a hotkey is
+// the only way to fire an action without leaving the text behind.
+func (m Model) keyHints() []string {
+	var out []string
+	for _, i := range m.shownActions() {
+		if a := m.cfg.Actions[i]; a.Key != "" {
+			out = append(out, "["+a.Key+"] "+strings.ToLower(a.Label))
+		}
+	}
+	return out
+}
+
 // hint is the key legend. It changes with the mode: there is no point offering
 // [a]/[n] while runes are going into the query.
 func (m Model) hint() string {
@@ -98,7 +111,9 @@ func (m Model) hint() string {
 		return "[←] yes   [→] no   [enter] answer   [esc] cancel"
 	}
 	if m.filtering {
-		return "[esc] clear filter   [ctrl+w] delete word   [tab] back to list   [enter] go"
+		parts := []string{"[esc] clear filter", "[ctrl+w] delete word"}
+		parts = append(parts, m.keyHints()...)
+		return strings.Join(append(parts, "[tab] back to list", "[enter] go"), "   ")
 	}
 	parts := []string{"[↑↓] move"}
 	if m.cfg.MultiSelect {
@@ -132,10 +147,10 @@ func (m Model) View() string {
 	if m.confirming {
 		b.WriteString(m.clamp(fmt.Sprintf("%s  %s  %s",
 			m.question, m.drawButton("Yes", m.confirmYes), m.drawButton("No", !m.confirmYes))) + "\n")
-	} else if len(m.cfg.Actions) > 0 {
+	} else if shown := m.shownActions(); len(shown) > 0 {
 		var row []string
-		for i, a := range m.cfg.Actions {
-			row = append(row, m.drawButton(a.Label, i == m.button))
+		for _, i := range shown {
+			row = append(row, m.drawButton(m.cfg.Actions[i].Label, i == m.button))
 		}
 		b.WriteString(m.clamp(strings.Join(row, "  ")) + "\n")
 	}

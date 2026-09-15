@@ -32,11 +32,12 @@ func filtered(all []Row, query []rune) []Row {
 }
 
 // queryChanged re-applies the filter and starts the cursor over: after an edit
-// the old position points at a row that may no longer be there.
+// the old position points at a row that may no longer be there. The button row
+// is re-clamped too, since an Action.Show may read the query.
 func (m Model) queryChanged() Model {
 	m.cursor = 0
 	m.top = 0
-	return m.clampCursor()
+	return m.clampCursor().clampButton()
 }
 
 func (m Model) clearFilter() Model {

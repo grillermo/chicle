@@ -60,13 +60,13 @@ func (m Model) setAll(on bool) Model {
 func (m Model) Selection() Selection {
 	cur := m.CursorRow()
 	if !m.cfg.MultiSelect {
-		sel := Selection{Cursor: cur}
+		sel := Selection{Cursor: cur, Filter: string(m.query)}
 		if cur.Key != "" {
 			sel.Ticked = []Row{cur}
 		}
 		return sel
 	}
-	sel := Selection{Cursor: cur}
+	sel := Selection{Cursor: cur, Filter: string(m.query)}
 	for _, r := range m.rows {
 		if r.Ticked {
 			sel.Ticked = append(sel.Ticked, r)

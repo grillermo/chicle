@@ -42,7 +42,18 @@ type Model struct {
 func New(cfg Config) Model {
 	m := Model{cfg: cfg, styles: newStyles(lipgloss.DefaultRenderer())}
 	m.rows = append([]Row(nil), cfg.Rows...)
-	return m.normaliseLocks()
+	m = m.normaliseLocks()
+
+	// A pre-filled Filter opens the list exactly as "/" plus typing would
+	// leave it, keyboard included: the caller is offering a guess, and the
+	// first thing the user may want is to correct it.
+	if cfg.Filter != "" {
+		m.query = []rune(cfg.Filter)
+		m.qpos = len(m.query)
+		m.filtering = true
+		m = m.queryChanged()
+	}
+	return m.clampButton()
 }
 
 func (m Model) Init() tea.Cmd { return waitForUpdate(m.cfg.Updates) }
@@ -103,6 +114,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.toggleCursor(), nil
 				}
 				return m.insertRune(' '), nil
+			}
+			// Hotkeys still fire while filtering, now that runes have been
+			// dealt with above. An action revealed by the filter would
+			// otherwise be unreachable without leaving the query first, which
+			// is the wrong shape for an action that exists to use the query.
+			if i, ok := m.keyedAction(s); ok {
+				m.button = i
+				next, done := m.activate()
+				if done {
+					return next, tea.Quit
+				}
+				return next, nil
 			}
 			next, quit := m.updateFiltering(s)
 			if quit {
