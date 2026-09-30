@@ -67,7 +67,7 @@ type Action struct {
 	// left/right and Enter. If more than one Action shares a Key, the last
 	// one in the slice wins — chicle does not validate this at New or Run
 	// time, consistent with the rest of Config. Avoid keys chicle already
-	// binds (up/down/left/right/enter/esc/q/ctrl+c/j/k, and space/a/n under
+	// binds (up/down/left/right/enter/esc/q/ctrl+c/j/k, ctrl+e/ctrl+f/ctrl+b/pgup/pgdown, and space/a/n under
 	// MultiSelect) — Key shadows them for this action rather than erroring.
 	// Pressing Key also moves button focus to this action so Confirm/Run
 	// behave exactly as Enter would; if a Confirm prompt is then cancelled,

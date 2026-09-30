@@ -64,6 +64,21 @@ func (m Model) scrollToCursor() Model {
 	return m
 }
 
+// page moves the cursor and the window together by one screenful, dir +1 for
+// down and -1 for up, so the rows keep their place on screen as in vim's
+// ctrl+f/ctrl+b. It stops at either end rather than wrapping: a page key held
+// down should come to rest on the first or last row, not cycle forever.
+func (m Model) page(dir int) Model {
+	n := len(m.visibleRows())
+	if n == 0 {
+		return m
+	}
+	h := m.visibleHeight()
+	m.cursor = min(max(m.cursor+dir*h, 0), n-1)
+	m.top = min(max(m.top+dir*h, 0), max(n-h, 0))
+	return m.scrollToCursor()
+}
+
 // offscreen is how many rows fell off each end, for the "N more above" and
 // "N more below" hints.
 func (m Model) offscreen() (above, below int) {

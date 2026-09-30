@@ -99,6 +99,10 @@ func (m Model) updateFiltering(k string) (Model, bool) {
 		return m.move(-1).scrollToCursor(), false
 	case "down":
 		return m.move(1).scrollToCursor(), false
+	case "pgdown", "ctrl+f":
+		return m.page(1), false
+	case "pgup", "ctrl+b":
+		return m.page(-1), false
 	case "left":
 		if m.qpos > 0 {
 			m.qpos--

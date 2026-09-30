@@ -146,6 +146,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.move(1).scrollToCursor(), nil
 		case "up", "k":
 			return m.move(-1).scrollToCursor(), nil
+		case "ctrl+e", "ctrl+f", "pgdown":
+			return m.page(1), nil
+		case "ctrl+b", "pgup":
+			return m.page(-1), nil
 		case "/":
 			m.filtering = true
 			m.qpos = len(m.query)

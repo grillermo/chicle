@@ -116,6 +116,10 @@ func (m Model) hint() string {
 		return strings.Join(append(parts, "[tab] back to list", "[enter] go"), "   ")
 	}
 	parts := []string{"[↑↓] move"}
+	if above, below := m.offscreen(); above+below > 0 {
+		// Only worth the space when there is somewhere to page to.
+		parts = append(parts, "[^e ^b] page")
+	}
 	if m.cfg.MultiSelect {
 		parts = append(parts, "[space] toggle", "[a] all", "[n] none")
 	}

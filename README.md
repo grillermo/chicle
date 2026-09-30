@@ -208,6 +208,8 @@ The cursor stays on the row it was on (matched by `Key`), and ticks are kept.
 | Key                   | List                         | While filtering           |
 | --------------------- | ---------------------------- | ------------------------- |
 | `↑` `↓` / `k` `j`     | Move cursor                  | `↑` `↓` move cursor       |
+| `ctrl+e` / `ctrl+b`   | Page down / page up          | `ctrl+e` is end of query  |
+| `ctrl+f`, `pgdn` / `pgup` | Page down / page up      | Page down / page up       |
 | `←` `→`               | Move between actions         | Move within the query     |
 | `enter`               | Run focused action / pick    | Run focused action / pick |
 | `/`                   | Start filtering              | Types `/`                 |
