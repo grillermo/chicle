@@ -35,6 +35,9 @@ func TestConfigFilterNarrowsBeforeTheFirstKey(t *testing.T) {
 
 func TestConfigFilterLeavesTheKeyboardInTheQuery(t *testing.T) {
 	m := guessed(&acted{})
+	if m.qpos != len(m.query) {
+		t.Fatalf("qpos %d, want %d — the cursor belongs at the end of the guess", m.qpos, len(m.query))
+	}
 	// Typing continues the query rather than hitting a list binding.
 	eq(t, keys(press(t, m, "-prod")), []string{"web-prod"})
 }
@@ -87,7 +90,7 @@ func TestAHiddenActionIgnoresItsHotkey(t *testing.T) {
 	}
 }
 
-func TestAShownActionFiresItsHotkeyWhileFiltering(t *testing.T) {
+func TestAShownActionFiresItsHotkeyWhileAQueryIsSet(t *testing.T) {
 	var a acted
 	m := press(t, fixtureWithCreate(&a), "new", "ctrl+n")
 	if m.Result() != "created" {

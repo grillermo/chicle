@@ -1,10 +1,9 @@
 package chicle
 
-// chrome is the number of screen lines the list does not get: the title, the
-// query line, the column header, the blank line, the action row, and the
-// status line. It is
-// deliberately generous — one row too few is invisible, one row too many
-// scrolls the terminal and tears the frame.
+// chrome is the number of screen lines the list does not get: the title (when
+// set), the query line, the column header, the blank line, the action row, and
+// the status line. It is deliberately generous — one row too few is invisible,
+// one row too many scrolls the terminal and tears the frame.
 func (m Model) chrome() int {
 	n := 5
 	if m.cfg.Title != "" {

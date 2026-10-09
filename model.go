@@ -92,11 +92,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return next, nil
 		}
 		// Printable text goes to the query, so a bare rune is never a command.
-		if msg.Type == tea.KeyRunes {
-			for _, r := range msg.Runes {
-				m = m.insertRune(r)
-			}
-			return m, nil
+		// Alt+rune is not text: it falls through to the hotkeys, where it can
+		// match an Action.Key and is otherwise ignored.
+		if msg.Type == tea.KeyRunes && !msg.Alt {
+			return m.insertRunes(msg.Runes), nil
 		}
 		if msg.Type == tea.KeySpace {
 			// Space is the tick command under MultiSelect — a narrowed-down
@@ -105,7 +104,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cfg.MultiSelect {
 				return m.toggleCursor(), nil
 			}
-			return m.insertRune(' '), nil
+			return m.insertRunes([]rune{' '}), nil
 		}
 		// Hotkeys fire with a query set: an action revealed by the filter
 		// would otherwise be unreachable, and it exists to use the query.

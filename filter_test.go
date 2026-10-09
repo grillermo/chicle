@@ -1,6 +1,10 @@
 package chicle
 
-import "testing"
+import (
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // table is a two-column fixture, so we can prove matching spans all cells.
 func table() Model {
@@ -64,15 +68,18 @@ func TestTypingNarrowsTheListStraightAway(t *testing.T) {
 	eq(t, keys(m), []string{"1", "2"})
 }
 
-func TestJFiltersInsteadOfMoving(t *testing.T) {
-	m := press(t, table(), "j")
-	if string(m.query) != "j" {
-		t.Fatalf("query %q, want j", string(m.query))
+func TestPrintableKeysTypeInsteadOfActing(t *testing.T) {
+	// j and q used to move down and quit; both are plain text now.
+	m := press(t, table(), "j", "q")
+	if string(m.query) != "jq" {
+		t.Fatalf("query %q, want jq", string(m.query))
 	}
-	if m.cursor != 0 {
-		t.Fatalf("cursor %d, want 0 — j is text now, not a movement key", m.cursor)
+	if m.cursor != 0 || m.quit {
+		t.Fatalf("cursor %d, quit %v — j and q must not act as commands", m.cursor, m.quit)
 	}
-	eq(t, keys(m), []string(nil))
+	if got := len(m.visibleRows()); got != 0 {
+		t.Fatalf("%d rows visible, want 0 — nothing contains jq", got)
+	}
 }
 
 func TestBackspaceWidensAgain(t *testing.T) {
@@ -148,20 +155,15 @@ func TestEditingTheQueryResetsTheCursorToTheTop(t *testing.T) {
 	}
 }
 
-func TestEscClearsTheQuery(t *testing.T) {
-	m := press(t, table(), "web", "esc")
-	if string(m.query) != "" {
-		t.Fatalf("query %q, want empty", string(m.query))
-	}
-	eq(t, keys(m), []string{"1", "2", "3"})
-}
-
 func TestEscClearsTheFilterBeforeItQuits(t *testing.T) {
 	// A filtered list must not exit on the first esc — that would throw away
 	// the query and the session in one keystroke.
 	m := press(t, table(), "web", "esc")
 	if m.quit {
 		t.Fatal("quit on the first esc — should have cleared the filter instead")
+	}
+	if len(m.query) != 0 || m.qpos != 0 {
+		t.Fatalf("query %q qpos %d after esc, want empty", string(m.query), m.qpos)
 	}
 	eq(t, keys(m), []string{"1", "2", "3"})
 
@@ -171,19 +173,45 @@ func TestEscClearsTheFilterBeforeItQuits(t *testing.T) {
 	}
 }
 
-func TestQIsATextCharacter(t *testing.T) {
-	m := press(t, table(), "q")
-	if m.quit {
-		t.Fatal("q quit the picker — it must type instead")
-	}
-	if string(m.query) != "q" {
-		t.Fatalf("query %q, want %q", string(m.query), "q")
-	}
-}
-
-func TestCtrlCQuitsEven(t *testing.T) {
+func TestCtrlCQuits(t *testing.T) {
 	m := press(t, table(), "web", "ctrl+c")
 	if !m.quit {
 		t.Fatal("ctrl+c did not quit")
+	}
+}
+
+func TestMultibyteInputEditsByRune(t *testing.T) {
+	for _, word := range []string{"café", "日本語"} {
+		n := len([]rune(word))
+		m := press(t, table(), word)
+		if string(m.query) != word || m.qpos != n {
+			t.Fatalf("%q: query %q qpos %d, want qpos %d", word, string(m.query), m.qpos, n)
+		}
+		m = press(t, m, "left", "backspace")
+		want := string([]rune(word)[:n-2]) + string([]rune(word)[n-1:])
+		if string(m.query) != want || m.qpos != n-2 {
+			t.Fatalf("%q: after left+backspace query %q qpos %d, want %q/%d", word, string(m.query), m.qpos, want, n-2)
+		}
+	}
+}
+
+func send(t *testing.T, m Model, msg tea.KeyMsg) Model {
+	t.Helper()
+	next, _ := m.Update(msg)
+	return next.(Model)
+}
+
+func TestPastedTextInsertsAtOnceAndDropsControlRunes(t *testing.T) {
+	m := press(t, table(), "wb", "left")
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e\n\tx\r")})
+	if string(m.query) != "wexb" || m.qpos != 3 {
+		t.Fatalf("query %q qpos %d, want wexb/3", string(m.query), m.qpos)
+	}
+}
+
+func TestAltRunesAreNotInserted(t *testing.T) {
+	m := send(t, table(), tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x"), Alt: true})
+	if len(m.query) != 0 || m.quit {
+		t.Fatalf("query %q quit %v, want alt+x ignored", string(m.query), m.quit)
 	}
 }

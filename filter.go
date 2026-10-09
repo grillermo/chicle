@@ -1,6 +1,9 @@
 package chicle
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 // matches reports whether row satisfies every term. Terms are ANDed, and each
 // one may land in any cell: typing "web prod" narrows twice rather than
@@ -46,11 +49,22 @@ func (m Model) clearFilter() Model {
 	return m.queryChanged()
 }
 
-// insertRune types r at the query cursor.
-func (m Model) insertRune(r rune) Model {
-	tail := append([]rune{r}, m.query[m.qpos:]...)
-	m.query = append(append([]rune(nil), m.query[:m.qpos]...), tail...)
-	m.qpos++
+// insertRunes types rs at the query cursor and re-filters once, so a paste
+// costs one pass over the rows rather than one per rune. Control runes are
+// dropped: a pasted newline or tab has no place in a single-line query.
+func (m Model) insertRunes(rs []rune) Model {
+	typed := make([]rune, 0, len(rs))
+	for _, r := range rs {
+		if !unicode.IsControl(r) {
+			typed = append(typed, r)
+		}
+	}
+	if len(typed) == 0 {
+		return m
+	}
+	q := append(append([]rune(nil), m.query[:m.qpos]...), typed...)
+	m.query = append(q, m.query[m.qpos:]...)
+	m.qpos += len(typed)
 	return m.queryChanged()
 }
 

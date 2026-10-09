@@ -61,6 +61,13 @@ func TestTheQueryLineShowsACursor(t *testing.T) {
 	}
 }
 
+func TestTheCursorIsDrawnMidQueryAfterLeft(t *testing.T) {
+	m := press(t, resize(t, fixture("alpha"), 80, tallEnough), "alp", "left")
+	if v := view(t, m); !strings.Contains(v, "al"+queryCursor+"p") {
+		t.Fatalf("cursor not drawn between l and p:\n%s", v)
+	}
+}
+
 func TestViewShowsActionLabels(t *testing.T) {
 	m := resize(t, withActions(
 		Action{Label: "Open", Run: (&acted{}).run(Outcome{})},
