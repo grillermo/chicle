@@ -25,6 +25,8 @@ type Model struct {
 	button int    // focused action, or onList when focus is on the rows
 	status string // message under the action row
 
+	backToList bool // a hotkey fired from the list; focus returns there after
+
 	confirming bool   // the prompt replaces the action row
 	confirmYes bool   // focus sits on No until the user moves it
 	question   string // text of the pending prompt
@@ -91,6 +93,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s := msg.String()
 		if m.confirming {
 			next, done := m.updateConfirm(s)
+			if !next.confirming && next.backToList {
+				next.backToList = false
+				if !done {
+					next.button = onList
+				}
+			}
 			if done {
 				return next, tea.Quit
 			}
@@ -109,8 +117,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// would otherwise be unreachable, and it exists to use the query.
 		// Plain runes were dealt with above, so only named and alt keys can match.
 		if i, ok := m.keyedAction(s); ok {
+			from := m.button
 			m.button = i
 			next, done := m.activate()
+			// A hotkey fired from the list is a one-off: put focus back so the
+			// next Enter ticks rather than re-running the action. A pending
+			// prompt defers that until it is answered.
+			if from == onList && !done {
+				if next.confirming {
+					next.backToList = true
+				} else {
+					next.button = onList
+				}
+			}
 			if done {
 				return next, tea.Quit
 			}

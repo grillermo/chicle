@@ -34,6 +34,19 @@ func filtered(all []Row, query []rune) []Row {
 	return out
 }
 
+// visibleIndices is filtered's counterpart that reports positions in all
+// rather than copies, for callers that must write back to the matching rows.
+func visibleIndices(all []Row, query []rune) []int {
+	terms := strings.Fields(strings.ToLower(string(query)))
+	out := make([]int, 0, len(all))
+	for i, r := range all {
+		if len(terms) == 0 || matches(r, terms) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // queryChanged re-applies the filter and starts the cursor over: after an edit
 // the old position points at a row that may no longer be there. The button row
 // is re-clamped too, since an Action.Show may read the query.

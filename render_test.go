@@ -237,3 +237,15 @@ func TestNoButtonIsHighlightedWithListFocus(t *testing.T) {
 		t.Fatalf("focused button not highlighted")
 	}
 }
+
+func TestNoTabHintWhenNoButtonIsShown(t *testing.T) {
+	m := New(Config{
+		Columns:     []Column{{Title: "N"}},
+		Rows:        rows("a"),
+		MultiSelect: true,
+		Actions:     []Action{{Label: "Hidden", Show: func(Selection) bool { return false }}},
+	})
+	if h := resize(t, m, 80, tallEnough).hint(); strings.Contains(h, "[tab]") {
+		t.Fatalf("legend offers tab with no buttons:\n%s", h)
+	}
+}

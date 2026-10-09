@@ -231,11 +231,11 @@ Printable keys type straight into the query; there is no separate filter mode.
 | `home` / `end`             | Query cursor to start / end                       |
 | `backspace`                | Delete a character                                |
 | `ctrl+w` / `ctrl+u`        | Delete a word / the whole query                   |
-| `tab` / `shift+tab`        | Next / previous action button (`MultiSelect`: the list comes first) |
-| `enter`                    | Run focused action / pick; toggle tick when the `MultiSelect` list is focused |
+| `tab` / `shift+tab`        | Next / previous button (`MultiSelect`: list first) |
+| `enter`                    | Run focused action / pick; tick on a focused `MultiSelect` list |
 | `esc`                      | Clear the query if there is one, else quit        |
 | `ctrl+c`                   | Quit                                              |
-| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick / untick all visible rows             |
+| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick / untick all visible rows      |
 
 In a confirmation prompt, `←`/`y` means yes and `→`/`n` means no. `enter`
 answers and `esc` cancels. The prompt starts on **No**.
@@ -249,9 +249,9 @@ Quit with `esc` (when the query is empty) or `ctrl+c`; tick all and none are
 `Action.Key` that is a printable character never fires, so switch it to a
 named key such as `ctrl+d` or `ctrl+n`.
 
-Under `MultiSelect` `enter` toggles the cursor row
-and `space` types into the query like anywhere else. Focus starts on the list;
-`tab` reaches the buttons, and `ctrl+a`/`ctrl+x` only touch visible rows.
+Under `MultiSelect`, `enter` toggles the cursor row and `space` types into the
+query like anywhere else. Focus starts on the list; `tab` reaches the buttons,
+and `ctrl+a`/`ctrl+x` only touch visible rows.
 
 ## Testing
 

@@ -170,3 +170,15 @@ func TestSpaceTypesIntoTheQueryUnderMultiSelect(t *testing.T) {
 		t.Fatalf("%d rows ticked by space, want 0", got)
 	}
 }
+
+func TestSetAllMatchesVisibleRowsByPositionNotKey(t *testing.T) {
+	// Keys should be unique, but a duplicate must not tick its hidden twin.
+	m := multi(
+		Row{Key: "k", Cols: []string{"alpha"}},
+		Row{Key: "k", Cols: []string{"beta"}},
+	)
+	m = press(t, m, "alp", "ctrl+a")
+	if !m.rows[0].Ticked || m.rows[1].Ticked {
+		t.Fatalf("ticks %v %v, want only the visible row", m.rows[0].Ticked, m.rows[1].Ticked)
+	}
+}

@@ -123,7 +123,10 @@ type Config struct {
 	// rows the current filter shows (never the ones it hides, and never a
 	// locked row). Focus starts on the list; tab moves from the list to the
 	// buttons and shift+tab back, and enter runs a button only once it is
-	// focused (an Action.Key still fires from anywhere).
+	// focused (an Action.Key still fires from anywhere, and a hotkey fired
+	// from the list hands focus back to it). With no Actions there is nothing
+	// to focus, so enter only toggles: the picker can be cancelled with esc
+	// but not finished.
 	MultiSelect bool
 
 	// NoCycle stops the cursor at the ends of the list instead of wrapping

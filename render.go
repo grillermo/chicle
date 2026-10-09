@@ -131,9 +131,9 @@ func (m Model) hint() string {
 	}
 	parts = append(parts, m.keyHints()...)
 	switch {
-	case m.cfg.MultiSelect && m.button == onList && len(m.cfg.Actions) > 0:
+	case m.cfg.MultiSelect && m.button == onList && len(m.shownActions()) > 0:
 		parts = append(parts, "[tab] buttons")
-	case m.cfg.MultiSelect && len(m.cfg.Actions) > 0:
+	case m.cfg.MultiSelect && len(m.shownActions()) > 0:
 		parts = append(parts, "[tab] next button", "[shift+tab] back")
 	case len(m.cfg.Actions) > 1:
 		parts = append(parts, "[tab] next button")

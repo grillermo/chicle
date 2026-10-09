@@ -509,11 +509,11 @@ func TestTabWalksFromTheListThroughTheButtonsAndClamps(t *testing.T) {
 	}
 }
 
-func TestHotkeyFiresFromTheListAndMovesFocus(t *testing.T) {
+func TestHotkeyFiresFromTheListAndReturnsFocus(t *testing.T) {
 	a := &acted{}
 	m := press(t, multiActions(a), "enter", "ctrl+n")
-	if len(a.calls) != 1 || m.button != 1 {
-		t.Fatalf("calls %d button %d, want the hotkey action run and focused", len(a.calls), m.button)
+	if len(a.calls) != 1 || m.button != onList {
+		t.Fatalf("calls %d button %d, want the hotkey action run and focus back on the list", len(a.calls), m.button)
 	}
 	eq(t, ticked(m), []string{"a"})
 	if got := a.calls[0].Ticked; len(got) != 1 || got[0].Key != "a" {
@@ -556,5 +556,77 @@ func TestSingleSelectKeepsAButtonFocusedAndEnterRunsIt(t *testing.T) {
 	m = press(t, m, "enter")
 	if m.Result() != "x" {
 		t.Fatalf("result %q, want x", m.Result())
+	}
+}
+
+func TestHotkeyWithReloadKeepsListFocus(t *testing.T) {
+	a := &acted{}
+	m := New(Config{
+		Columns:     []Column{{Title: "N"}},
+		Rows:        rows("a", "b"),
+		MultiSelect: true,
+		Reload:      func() ([]Row, error) { return rows("a", "b"), nil },
+		Actions:     []Action{{Label: "Del", Key: "ctrl+n", Run: a.run(Outcome{Status: "deleted"})}},
+	})
+	m = press(t, m, "ctrl+n", "enter")
+	if m.button != onList || len(a.calls) != 1 {
+		t.Fatalf("button %d calls %d, want the next enter to tick, not re-run", m.button, len(a.calls))
+	}
+	eq(t, ticked(m), []string{"a"})
+}
+
+func TestHotkeyConfirmCancelReturnsToTheList(t *testing.T) {
+	for _, answer := range []string{"esc", "n", "enter"} { // enter answers No
+		a := &acted{}
+		m := New(Config{
+			Columns:     []Column{{Title: "N"}},
+			Rows:        rows("a", "b"),
+			MultiSelect: true,
+			Actions: []Action{{Label: "Del", Key: "ctrl+n",
+				Confirm: func(Selection) string { return "sure?" },
+				Run:     a.run(Outcome{Status: "deleted"})}},
+		})
+		m = press(t, m, "ctrl+n")
+		if !m.confirming {
+			t.Fatalf("%s: no prompt", answer)
+		}
+		m = press(t, m, answer)
+		if m.confirming || m.button != onList || len(a.calls) != 0 {
+			t.Fatalf("%s: confirming %v button %d calls %d, want back on the list", answer, m.confirming, m.button, len(a.calls))
+		}
+	}
+}
+
+func TestHotkeyConfirmYesReturnsToTheList(t *testing.T) {
+	a := &acted{}
+	m := New(Config{
+		Columns:     []Column{{Title: "N"}},
+		Rows:        rows("a", "b"),
+		MultiSelect: true,
+		Actions: []Action{{Label: "Del", Key: "ctrl+n",
+			Confirm: func(Selection) string { return "sure?" },
+			Run:     a.run(Outcome{Status: "deleted"})}},
+	})
+	m = press(t, m, "ctrl+n", "y")
+	if m.button != onList || len(a.calls) != 1 {
+		t.Fatalf("button %d calls %d, want the action run and focus on the list", m.button, len(a.calls))
+	}
+}
+
+func TestHotkeyFromAFocusedButtonKeepsItFocused(t *testing.T) {
+	a := &acted{}
+	m := press(t, multiActions(a), "tab", "ctrl+n")
+	if m.button != 1 || len(a.calls) != 1 {
+		t.Fatalf("button %d calls %d, want the hotkey action focused", m.button, len(a.calls))
+	}
+}
+
+func TestMultiSelectWithoutActionsCannotFinishViaEnter(t *testing.T) {
+	m := press(t, multi(rows("a", "b")...), "enter", "enter")
+	if m.quit || m.Result() != "" {
+		t.Fatalf("quit %v result %q, want enter to only toggle", m.quit, m.Result())
+	}
+	if m = press(t, m, "esc"); !m.quit {
+		t.Fatal("esc did not cancel")
 	}
 }
