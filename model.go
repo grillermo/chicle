@@ -108,7 +108,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Hotkeys fire with a query set: an action revealed by the filter
 		// would otherwise be unreachable, and it exists to use the query.
-		// Runes were dealt with above, so only named keys can match.
+		// Plain runes were dealt with above, so only named and alt keys can match.
 		if i, ok := m.keyedAction(s); ok {
 			m.button = i
 			next, done := m.activate()

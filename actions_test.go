@@ -3,6 +3,8 @@ package chicle
 import (
 	"errors"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var errBoom = errors.New("boom")
@@ -429,5 +431,17 @@ func TestANamedKeyStillFiresWhileAQueryIsSet(t *testing.T) {
 	}
 	if got := a.calls[0].Filter; got != "a" {
 		t.Fatalf("action got filter %q, want a", got)
+	}
+}
+
+func TestAnAltKeyFiresAnAction(t *testing.T) {
+	var a acted
+	m := withActions(Action{Label: "Go", Key: "alt+x", Run: a.run(Outcome{Done: true})})
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x"), Alt: true})
+	if len(a.calls) != 1 || !m.quit {
+		t.Fatalf("alt+x ran the action %d times, want 1", len(a.calls))
+	}
+	if len(m.query) != 0 {
+		t.Fatalf("query %q, want alt+x kept out of the query", string(m.query))
 	}
 }

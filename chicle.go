@@ -64,11 +64,15 @@ type Action struct {
 	// Key, when set, fires this action immediately on that key (bubbletea's
 	// tea.KeyMsg.String() form, e.g. "f2"), without requiring the action to
 	// be focused first. Leave empty for actions only reachable via
-	// left/right and Enter. If more than one Action shares a Key, the last
+	// tab/shift+tab and Enter. If more than one Action shares a Key, the last
 	// one in the slice wins — chicle does not validate this at New or Run
-	// time, consistent with the rest of Config. Avoid keys chicle already
-	// binds (up/down/left/right/enter/esc/q/ctrl+c/j/k, ctrl+e/ctrl+f/ctrl+b/pgup/pgdown, and space/a/n under
-	// MultiSelect) — Key shadows them for this action rather than erroring.
+	// time, consistent with the rest of Config. Printable keys can never be a
+	// Key: they type into the query, so a Key like "x" never fires. Named keys
+	// such as "f1", "f2", "ctrl+n" and "alt+x" work. Avoid keys chicle already
+	// binds (up/down/left/right/home/end/enter/esc/tab/shift+tab/backspace,
+	// ctrl+c/ctrl+w/ctrl+u, ctrl+e/ctrl+f/ctrl+b/pgup/pgdown, space, and
+	// ctrl+a/ctrl+x under MultiSelect) — Key shadows them for this action
+	// rather than erroring.
 	// Pressing Key also moves button focus to this action so Confirm/Run
 	// behave exactly as Enter would; if a Confirm prompt is then cancelled,
 	// focus stays on this action rather than reverting to what was focused
@@ -102,9 +106,9 @@ type Config struct {
 	Columns []Column
 	Rows    []Row
 
-	// Filter pre-fills the query, as though the user had pressed "/" and typed
-	// it: the list opens narrowed, with the keyboard in the query so it can be
-	// refined, and Enter fires the focused action on whatever is left. Use it
+	// Filter pre-fills the query, which the user can edit: the list opens
+	// narrowed with the query cursor at the end, so it can be refined, and
+	// Enter fires the focused action on whatever is left. Use it
 	// to open on a guess -- the caller had a name in mind and wants it
 	// confirmed rather than assumed.
 	Filter string
@@ -114,8 +118,9 @@ type Config struct {
 	// the whole API for a plain "pick one thing" list.
 	Actions []Action
 
-	// MultiSelect turns on checkboxes: space toggles, "a" ticks everything,
-	// "n" unticks everything unlocked.
+	// MultiSelect turns on checkboxes: space toggles, ctrl+a ticks every
+	// row, ctrl+x unticks every unlocked row. Because space toggles, a space
+	// can't be typed into the query under MultiSelect.
 	MultiSelect bool
 
 	// NoCycle stops the cursor at the ends of the list instead of wrapping

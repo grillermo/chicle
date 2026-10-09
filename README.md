@@ -13,11 +13,11 @@ inside command substitution: `sel=$(mypicker)`. Built on
 
 - **Plain single-select lists** in a few lines. With no actions configured,
   Enter returns the cursor row's `Key`.
-- **Filtering**: press `/` and type. Terms are case-insensitive and ANDed, and
-  each can match any cell, so `web prod` narrows twice. Query editing supports
-  readline keys (`ctrl+a`, `ctrl+e`, `ctrl+w`, `ctrl+u`).
+- **Filtering**: just type. Terms are case-insensitive and ANDed, and each can
+  match any cell, so `web prod` narrows twice. The query line supports
+  `←` `→`, `home`, `end`, `backspace`, `ctrl+w` and `ctrl+u`.
 - **Pre-filled filter**: open the list already narrowed to a guess, with the
-  keyboard in the query so the user can correct it.
+  query editable so the user can correct it.
 - **Multi-select** with checkboxes, select all and select none, plus **locked**
   rows that stay ticked.
 - **Section headings** that group adjacent rows. The cursor skips headings.
@@ -106,7 +106,7 @@ chicle.Config{
 		},
 		{
 			Label: "Delete",
-			Key:   "d",
+			Key:   "f2",
 			Confirm: func(s chicle.Selection) string {
 				return "Delete " + s.Cursor.Key + "?"
 			},
@@ -128,9 +128,11 @@ chicle.Config{
 - `Done: false` keeps the list open, shows `Status` under the buttons, and
   calls `Config.Reload` if it's set. If the list ends up empty, the picker
   closes.
-- `Key` fires the action right away, even while filtering. Don't use keys
-  chicle already binds (see [Keys](#keys)): an action's `Key` takes over that
-  key instead of raising an error. If two actions share a `Key`, the last one
+- `Key` fires the action right away, even with a query typed. It must be a
+  named key such as `f2`, `ctrl+n` or `alt+x`: printable keys type into the
+  query, so a `Key` like `"d"` never fires. Don't use keys chicle already
+  binds (see [Keys](#keys)): an action's `Key` takes over that key instead of
+  raising an error. If two actions share a `Key`, the last one
   wins.
 - `Show` hides the action, including its hotkey, whenever it returns false.
 - `OnEmpty` lets the action run when the filter matches no rows. Use it with
@@ -163,7 +165,9 @@ chicle.Config{
 ```
 
 `Selection.Ticked` holds every ticked row. `Locked` rows are always ticked and
-can't be unticked. Without `MultiSelect`, `Ticked` holds only the cursor row,
+can't be unticked. `space` toggles the row under the cursor, `ctrl+a` ticks
+every row and `ctrl+x` unticks every unlocked row. Because `space` toggles, a
+space can't be typed into the query under `MultiSelect`. Without `MultiSelect`, `Ticked` holds only the cursor row,
 so the same `Run` works for both kinds of list.
 
 ### Sections
@@ -178,7 +182,8 @@ headings are drawn when every visible row is in the same section.
 chicle.Config{Filter: "prod", /* ... */}
 ```
 
-The list opens as if the user had pressed `/` and typed `prod`.
+The list opens with `prod` already in the query, narrowed to matching rows.
+The user can edit it like any typed text.
 
 ### Slow columns
 
@@ -205,24 +210,36 @@ The cursor stays on the row it was on (matched by `Key`), and ticks are kept.
 
 ## Keys
 
-| Key                   | List                         | While filtering           |
-| --------------------- | ---------------------------- | ------------------------- |
-| `↑` `↓` / `k` `j`     | Move cursor                  | `↑` `↓` move cursor       |
-| `ctrl+e` / `ctrl+b`   | Page down / page up          | `ctrl+e` is end of query  |
-| `ctrl+f`, `pgdn` / `pgup` | Page down / page up      | Page down / page up       |
-| `←` `→`               | Move between actions         | Move within the query     |
-| `enter`               | Run focused action / pick    | Run focused action / pick |
-| `/`                   | Start filtering              | Types `/`                 |
-| `tab`                 |                              | Back to the list, keeping the filter |
-| `esc`                 | Clear filter, else quit      | Clear filter              |
-| `q`, `ctrl+c`         | Quit                         | `ctrl+c` quits            |
-| `space`, `x`          | Toggle tick (multi-select)   | `space` toggles tick (multi-select) |
-| `a` / `n`             | Tick all / untick all        |                           |
-| `ctrl+a` / `ctrl+e`   |                              | Start / end of query      |
-| `ctrl+w` / `ctrl+u`   |                              | Delete word / whole query |
+Printable keys type straight into the query; there is no separate filter mode.
+
+| Key                        | Does                                              |
+| -------------------------- | ------------------------------------------------- |
+| any printable character    | Insert into the query at the cursor               |
+| `space`                    | Toggle tick under `MultiSelect`, else insert a space |
+| `↑` `↓`                    | Move the row cursor                               |
+| `ctrl+e`, `ctrl+f`, `pgdn` | Page down                                         |
+| `ctrl+b`, `pgup`           | Page up                                           |
+| `←` `→`                    | Move the query cursor                             |
+| `home` / `end`             | Query cursor to start / end                       |
+| `backspace`                | Delete a character                                |
+| `ctrl+w` / `ctrl+u`        | Delete a word / the whole query                   |
+| `tab` / `shift+tab`        | Next / previous action button                     |
+| `enter`                    | Run focused action / pick                         |
+| `esc`                      | Clear the query if there is one, else quit        |
+| `ctrl+c`                   | Quit                                              |
+| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick all / untick all              |
 
 In a confirmation prompt, `←`/`y` means yes and `→`/`n` means no. `enter`
 answers and `esc` cancels. The prompt starts on **No**.
+
+## Upgrading to v0.4.0
+
+Breaking change: the `/` step is gone and typing filters immediately. `/`, `j`,
+`k`, `q`, `a`, `n` and `x` are now ordinary characters that go into the query.
+Quit with `esc` (when the query is empty) or `ctrl+c`; tick all and none are
+`ctrl+a` and `ctrl+x`; move between buttons with `tab` and `shift+tab`. An
+`Action.Key` that is a printable character never fires, so switch it to a
+named key such as `f2` or `ctrl+n`.
 
 ## Testing
 
