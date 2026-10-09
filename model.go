@@ -22,7 +22,7 @@ type Model struct {
 	query []rune // the filter text, matched against every cell
 	qpos  int    // cursor position within query
 
-	button int    // focused action
+	button int    // focused action, or onList when focus is on the rows
 	status string // message under the action row
 
 	confirming bool   // the prompt replaces the action row
@@ -50,6 +50,11 @@ func New(cfg Config) Model {
 		m.query = []rune(cfg.Filter)
 		m.qpos = len(m.query)
 		m = m.queryChanged()
+	}
+	// Enter ticks under MultiSelect, so focus starts on the rows; a button must
+	// be tabbed to before Enter runs it.
+	if cfg.MultiSelect {
+		m.button = onList
 	}
 	return m.clampButton()
 }
@@ -98,12 +103,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.insertRunes(msg.Runes), nil
 		}
 		if msg.Type == tea.KeySpace {
-			// Space is the tick command under MultiSelect — a narrowed-down
-			// list is exactly when you want to tick the one row you searched
-			// for, not type a literal space.
-			if m.cfg.MultiSelect {
-				return m.toggleCursor(), nil
-			}
 			return m.insertRunes([]rune{' '}), nil
 		}
 		// Hotkeys fire with a query set: an action revealed by the filter
@@ -134,6 +133,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "shift+tab":
 			return m.moveButton(-1), nil
 		case "enter":
+			if m.button == onList {
+				return m.toggleCursor(), nil
+			}
 			next, done := m.activate()
 			if done {
 				return next, tea.Quit

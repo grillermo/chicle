@@ -44,11 +44,18 @@ func (m Model) toggleCursor() Model {
 	return m
 }
 
-// setAll ticks or unticks every row. Locked rows stay ticked either way.
+// setAll ticks or unticks the rows the filter lets through; rows it hides keep
+// whatever tick they had. Locked rows stay ticked either way.
 func (m Model) setAll(on bool) Model {
+	shown := make(map[string]bool)
+	for _, r := range m.visibleRows() {
+		shown[r.Key] = true
+	}
 	rs := append([]Row(nil), m.rows...)
 	for i := range rs {
-		rs[i].Ticked = on || rs[i].Locked
+		if shown[rs[i].Key] {
+			rs[i].Ticked = on || rs[i].Locked
+		}
 	}
 	m.rows = rs
 	return m

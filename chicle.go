@@ -28,8 +28,8 @@ type Row struct {
 	// Meaningless unless Config.MultiSelect is set.
 	Ticked bool
 
-	// Locked rows are always ticked and can never be unticked — not by the
-	// spacebar, and not by "select none". Use it for choices that are already
+	// Locked rows are always ticked and can never be unticked — not by
+	// enter, and not by "select none". Use it for choices that are already
 	// committed elsewhere and must be undone deliberately.
 	Locked bool
 }
@@ -62,7 +62,7 @@ type Outcome struct {
 type Action struct {
 	Label string
 	// Key, when set, fires this action immediately on that key (bubbletea's
-	// tea.KeyMsg.String() form, e.g. "f2"), without requiring the action to
+	// tea.KeyMsg.String() form, e.g. "ctrl+d"), without requiring the action to
 	// be focused first. Leave empty for actions only reachable via
 	// tab/shift+tab and Enter. If more than one Action shares a Key, the last
 	// one in the slice wins — chicle does not validate this at New or Run
@@ -118,9 +118,12 @@ type Config struct {
 	// the whole API for a plain "pick one thing" list.
 	Actions []Action
 
-	// MultiSelect turns on checkboxes: space toggles, ctrl+a ticks every
-	// row, ctrl+x unticks every unlocked row. Because space toggles, a space
-	// can't be typed into the query under MultiSelect.
+	// MultiSelect turns on checkboxes: enter toggles the cursor row, so space
+	// is typed into the query as usual. ctrl+a ticks and ctrl+x unticks the
+	// rows the current filter shows (never the ones it hides, and never a
+	// locked row). Focus starts on the list; tab moves from the list to the
+	// buttons and shift+tab back, and enter runs a button only once it is
+	// focused (an Action.Key still fires from anywhere).
 	MultiSelect bool
 
 	// NoCycle stops the cursor at the ends of the list instead of wrapping

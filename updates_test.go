@@ -70,7 +70,7 @@ func TestUpdatesPreserveTicks(t *testing.T) {
 		Rows:        rows("a", "b"),
 		MultiSelect: true,
 	})
-	m = press(t, m, "space") // tick "a"
+	m = press(t, m, "enter") // tick "a"
 	m = deliver(t, m, rows("a", "b", "c"))
 	eq(t, ticked(m), []string{"a"})
 }

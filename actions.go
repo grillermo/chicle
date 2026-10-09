@@ -1,5 +1,10 @@
 package chicle
 
+// onList is the value of Model.button while focus is on the rows rather than
+// on any action. Only MultiSelect uses it: there Enter ticks, so running an
+// action takes a tab (or its hotkey) to reach a button first.
+const onList = -1
+
 // shownActions lists the actions currently on offer, as indices into
 // cfg.Actions. Indices rather than Actions because m.button names an action by
 // its position in the configured slice, which must not shift underneath it
@@ -27,6 +32,9 @@ func (m Model) shownActions() []int {
 // one can vanish -- clearing the filter takes its action with it -- and focus
 // left on an undrawn button is focus the user cannot see.
 func (m Model) clampButton() Model {
+	if m.button == onList {
+		return m // the rows are always there; nothing to pull focus off
+	}
 	shown := m.shownActions()
 	if len(shown) == 0 {
 		m.button = 0
@@ -47,9 +55,16 @@ func (m Model) clampButton() Model {
 
 // moveButton walks the action row, skipping hidden actions. Unlike the row
 // cursor this clamps: with a handful of buttons, holding a direction should
-// stop at the ends rather than snap back to the other side.
+// stop at the ends rather than snap back to the other side. Under MultiSelect
+// the list is the first stop, ahead of the first shown button.
 func (m Model) moveButton(delta int) Model {
 	shown := m.shownActions()
+	if m.button == onList {
+		if delta > 0 && len(shown) > 0 {
+			m.button = shown[0]
+		}
+		return m
+	}
 	if len(shown) == 0 {
 		return m
 	}
@@ -64,6 +79,10 @@ func (m Model) moveButton(delta int) Model {
 	}
 	at += delta
 	if at < 0 {
+		if m.cfg.MultiSelect {
+			m.button = onList
+			return m
+		}
 		at = 0
 	}
 	if at >= len(shown) {
@@ -102,7 +121,7 @@ func (m Model) activate() (Model, bool) {
 	// Focus can be stale: the filter may have hidden the action under it since
 	// the last keystroke that moved the button row.
 	m = m.clampButton()
-	if len(m.shownActions()) == 0 {
+	if m.button == onList || len(m.shownActions()) == 0 {
 		return m, false
 	}
 

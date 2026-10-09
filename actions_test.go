@@ -445,3 +445,116 @@ func TestAnAltKeyFiresAnAction(t *testing.T) {
 		t.Fatalf("query %q, want alt+x kept out of the query", string(m.query))
 	}
 }
+
+// multiActions is a MultiSelect list with two buttons, the first hotkeyed.
+func multiActions(a *acted) Model {
+	return New(Config{
+		Columns:     []Column{{Title: "N"}},
+		Rows:        rows("a", "b", "c"),
+		MultiSelect: true,
+		Actions: []Action{
+			{Label: "Go", Run: a.run(Outcome{Done: true, Result: "went"})},
+			{Label: "Del", Key: "ctrl+n", Run: a.run(Outcome{Status: "deleted"})},
+		},
+	})
+}
+
+func TestMultiSelectFocusStartsOnTheList(t *testing.T) {
+	m := multiActions(&acted{})
+	if m.button != onList {
+		t.Fatalf("button %d, want the list focused", m.button)
+	}
+}
+
+func TestEnterOnTheListTogglesInsteadOfRunning(t *testing.T) {
+	a := &acted{}
+	m := press(t, multiActions(a), "enter", "down", "enter")
+	eq(t, ticked(m), []string{"a", "b"})
+	if len(a.calls) != 0 || m.quit {
+		t.Fatalf("enter on the list ran an action: calls %d quit %v", len(a.calls), m.quit)
+	}
+	m = press(t, m, "up", "enter")
+	eq(t, ticked(m), []string{"b"})
+}
+
+func TestEnterOnAButtonRunsIt(t *testing.T) {
+	a := &acted{}
+	m := press(t, multiActions(a), "enter", "tab", "enter")
+	if m.button != 0 || !m.quit || m.Result() != "went" {
+		t.Fatalf("button %d quit %v result %q, want the first action run", m.button, m.quit, m.Result())
+	}
+	eq(t, ticked(m), []string{"a"}) // enter on the button did not toggle
+	if len(a.calls) != 1 {
+		t.Fatalf("%d calls, want 1", len(a.calls))
+	}
+}
+
+func TestTabWalksFromTheListThroughTheButtonsAndClamps(t *testing.T) {
+	m := multiActions(&acted{})
+	m = press(t, m, "shift+tab")
+	if m.button != onList {
+		t.Fatalf("button %d after shift+tab on the list, want to stay", m.button)
+	}
+	for i, want := range []int{0, 1, 1} {
+		m = press(t, m, "tab")
+		if m.button != want {
+			t.Fatalf("tab %d: button %d, want %d", i+1, m.button, want)
+		}
+	}
+	for i, want := range []int{0, onList, onList} {
+		m = press(t, m, "shift+tab")
+		if m.button != want {
+			t.Fatalf("shift+tab %d: button %d, want %d", i+1, m.button, want)
+		}
+	}
+}
+
+func TestHotkeyFiresFromTheListAndMovesFocus(t *testing.T) {
+	a := &acted{}
+	m := press(t, multiActions(a), "enter", "ctrl+n")
+	if len(a.calls) != 1 || m.button != 1 {
+		t.Fatalf("calls %d button %d, want the hotkey action run and focused", len(a.calls), m.button)
+	}
+	eq(t, ticked(m), []string{"a"})
+	if got := a.calls[0].Ticked; len(got) != 1 || got[0].Key != "a" {
+		t.Fatalf("action saw ticked %v, want [a]", got)
+	}
+}
+
+func TestListFocusSurvivesTheButtonsHiding(t *testing.T) {
+	m := New(Config{
+		Columns:     []Column{{Title: "N"}},
+		Rows:        rows("alpha", "beta"),
+		MultiSelect: true,
+		Actions: []Action{
+			{Label: "Go", Run: func(Selection) Outcome { return Outcome{Done: true} }},
+			{Label: "Use", Show: func(s Selection) bool { return s.Filter != "" },
+				Run: func(Selection) Outcome { return Outcome{Done: true} }},
+		},
+	})
+	m = press(t, m, "al", "esc")
+	if m.button != onList {
+		t.Fatalf("button %d, want focus to stay on the list", m.button)
+	}
+	// A focused button that gets hidden still slides to the nearest shown one.
+	m = press(t, m, "al", "tab", "tab", "esc")
+	if m.button != 0 {
+		t.Fatalf("button %d, want focus to slide to 0", m.button)
+	}
+}
+
+func TestSingleSelectKeepsAButtonFocusedAndEnterRunsIt(t *testing.T) {
+	a := &acted{}
+	m := withActions(Action{Label: "Go", Run: a.run(Outcome{Done: true, Result: "x"})})
+	if m.button != 0 {
+		t.Fatalf("button %d, want 0", m.button)
+	}
+	m = press(t, m, "shift+tab")
+	if m.button != 0 {
+		t.Fatalf("button %d after shift+tab, want 0 — no list focus without MultiSelect", m.button)
+	}
+	m = press(t, m, "enter")
+	if m.Result() != "x" {
+		t.Fatalf("result %q, want x", m.Result())
+	}
+}

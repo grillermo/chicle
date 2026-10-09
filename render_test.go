@@ -117,7 +117,7 @@ func TestViewShowsCheckboxesOnlyForMultiSelect(t *testing.T) {
 }
 
 func TestATickedRowIsMarked(t *testing.T) {
-	m := press(t, resize(t, multi(rows("a")...), 80, tallEnough), "space")
+	m := press(t, resize(t, multi(rows("a")...), 80, tallEnough), "enter")
 	if v := view(t, m); !strings.Contains(v, "[x]") {
 		t.Fatalf("ticked row not marked:\n%s", v)
 	}
@@ -167,7 +167,7 @@ func TestTheHelpLegendHasNoRetiredKeys(t *testing.T) {
 			t.Fatalf("legend offers %s, which is no longer a command:\n%s", gone, h)
 		}
 	}
-	for _, want := range []string{"[space] toggle", "[^a] all", "[^x] none", "[esc]"} {
+	for _, want := range []string{"[enter] toggle", "[^a] all", "[^x] none", "[esc]"} {
 		if !strings.Contains(h, want) {
 			t.Fatalf("legend lacks %s:\n%s", want, h)
 		}
@@ -213,3 +213,27 @@ func TestTruncateIsRuneSafe(t *testing.T) {
 }
 
 func lipglossWidth(s string) int { return lipgloss.Width(s) }
+
+func TestLegendFollowsFocusUnderMultiSelect(t *testing.T) {
+	m := resize(t, multiActions(&acted{}), 80, tallEnough)
+	h := m.hint()
+	if !strings.Contains(h, "[enter] toggle") || strings.Contains(h, "[enter] go") {
+		t.Fatalf("list-focused legend wrong:\n%s", h)
+	}
+	h = press(t, m, "tab").hint()
+	if strings.Contains(h, "toggle") || !strings.Contains(h, "[enter] go") {
+		t.Fatalf("button-focused legend wrong:\n%s", h)
+	}
+}
+
+func TestNoButtonIsHighlightedWithListFocus(t *testing.T) {
+	m := resize(t, colorModel(t, multiActions(&acted{})), 80, tallEnough)
+	b := m.drawButton("Go", true)
+	v := view(t, m)
+	if strings.Contains(v, b) {
+		t.Fatalf("a button is highlighted with the list focused:\n%s", v)
+	}
+	if !strings.Contains(view(t, press(t, m, "tab")), b) {
+		t.Fatalf("focused button not highlighted")
+	}
+}

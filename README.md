@@ -106,7 +106,7 @@ chicle.Config{
 		},
 		{
 			Label: "Delete",
-			Key:   "f2",
+			Key:   "ctrl+d",
 			Confirm: func(s chicle.Selection) string {
 				return "Delete " + s.Cursor.Key + "?"
 			},
@@ -129,7 +129,7 @@ chicle.Config{
   calls `Config.Reload` if it's set. If the list ends up empty, the picker
   closes.
 - `Key` fires the action right away, even with a query typed. It must be a
-  named key such as `f2`, `ctrl+n` or `alt+x`: printable keys type into the
+  named key such as `ctrl+d`, `f2` or `alt+x`: printable keys type into the
   query, so a `Key` like `"d"` never fires. Don't use keys chicle already
   binds (see [Keys](#keys)): an action's `Key` takes over that key instead of
   raising an error. If two actions share a `Key`, the last one
@@ -165,10 +165,18 @@ chicle.Config{
 ```
 
 `Selection.Ticked` holds every ticked row. `Locked` rows are always ticked and
-can't be unticked. `space` toggles the row under the cursor, `ctrl+a` ticks
-every row and `ctrl+x` unticks every unlocked row. Because `space` toggles, a
-space can't be typed into the query under `MultiSelect`. Without `MultiSelect`, `Ticked` holds only the cursor row,
-so the same `Run` works for both kinds of list.
+can't be unticked. `enter` toggles the row under the cursor, so `space` types
+into the query as usual. `ctrl+a` ticks and `ctrl+x` unticks the rows the
+current filter shows; rows it hides keep their ticks, and locked rows stay
+ticked.
+
+Because `enter` ticks, focus starts on the list with no button highlighted.
+`tab` moves from the list to the first button and on through the rest;
+`shift+tab` moves back, stopping at the list. With a button focused, `enter`
+runs it. An action's `Key` still fires from anywhere.
+
+Without `MultiSelect`, `Ticked` holds only the cursor row, so the same `Run`
+works for both kinds of list.
 
 ### Sections
 
@@ -215,7 +223,7 @@ Printable keys type straight into the query; there is no separate filter mode.
 | Key                        | Does                                              |
 | -------------------------- | ------------------------------------------------- |
 | any printable character    | Insert into the query at the cursor               |
-| `space`                    | Toggle tick under `MultiSelect`, else insert a space |
+| `space`                    | Insert a space into the query                     |
 | `↑` `↓`                    | Move the row cursor                               |
 | `ctrl+e`, `ctrl+f`, `pgdn` | Page down                                         |
 | `ctrl+b`, `pgup`           | Page up                                           |
@@ -223,11 +231,11 @@ Printable keys type straight into the query; there is no separate filter mode.
 | `home` / `end`             | Query cursor to start / end                       |
 | `backspace`                | Delete a character                                |
 | `ctrl+w` / `ctrl+u`        | Delete a word / the whole query                   |
-| `tab` / `shift+tab`        | Next / previous action button                     |
-| `enter`                    | Run focused action / pick                         |
+| `tab` / `shift+tab`        | Next / previous action button (`MultiSelect`: the list comes first) |
+| `enter`                    | Run focused action / pick; toggle tick when the `MultiSelect` list is focused |
 | `esc`                      | Clear the query if there is one, else quit        |
 | `ctrl+c`                   | Quit                                              |
-| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick all / untick all              |
+| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick / untick all visible rows             |
 
 In a confirmation prompt, `←`/`y` means yes and `→`/`n` means no. `enter`
 answers and `esc` cancels. The prompt starts on **No**.
@@ -239,7 +247,11 @@ Breaking change: the `/` step is gone and typing filters immediately. `/`, `j`,
 Quit with `esc` (when the query is empty) or `ctrl+c`; tick all and none are
 `ctrl+a` and `ctrl+x`; move between buttons with `tab` and `shift+tab`. An
 `Action.Key` that is a printable character never fires, so switch it to a
-named key such as `f2` or `ctrl+n`.
+named key such as `ctrl+d` or `ctrl+n`.
+
+Under `MultiSelect` `enter` toggles the cursor row
+and `space` types into the query like anywhere else. Focus starts on the list;
+`tab` reaches the buttons, and `ctrl+a`/`ctrl+x` only touch visible rows.
 
 ## Testing
 

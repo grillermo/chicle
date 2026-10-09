@@ -124,10 +124,18 @@ func (m Model) hint() string {
 		parts = append(parts, "[^e ^b] page")
 	}
 	if m.cfg.MultiSelect {
-		parts = append(parts, "[space] toggle", "[^a] all", "[^x] none")
+		if m.button == onList {
+			parts = append(parts, "[enter] toggle")
+		}
+		parts = append(parts, "[^a] all", "[^x] none")
 	}
 	parts = append(parts, m.keyHints()...)
-	if len(m.cfg.Actions) > 1 {
+	switch {
+	case m.cfg.MultiSelect && m.button == onList && len(m.cfg.Actions) > 0:
+		parts = append(parts, "[tab] buttons")
+	case m.cfg.MultiSelect && len(m.cfg.Actions) > 0:
+		parts = append(parts, "[tab] next button", "[shift+tab] back")
+	case len(m.cfg.Actions) > 1:
 		parts = append(parts, "[tab] next button")
 	}
 	if len(m.query) > 0 {
@@ -135,7 +143,9 @@ func (m Model) hint() string {
 	} else {
 		parts = append(parts, "[esc] quit")
 	}
-	parts = append(parts, "[enter] go")
+	if m.button != onList {
+		parts = append(parts, "[enter] go") // on the list, Enter ticks instead
+	}
 	return strings.Join(parts, "   ")
 }
 

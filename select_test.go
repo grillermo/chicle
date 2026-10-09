@@ -21,20 +21,20 @@ func ticked(m Model) []string {
 	return out
 }
 
-func TestSpaceTicksTheCursorRow(t *testing.T) {
-	m := press(t, multi(rows("a", "b", "c")...), "space")
+func TestEnterTicksTheCursorRow(t *testing.T) {
+	m := press(t, multi(rows("a", "b", "c")...), "enter")
 	eq(t, ticked(m), []string{"a"})
 }
 
-func TestSpaceUnticksAgain(t *testing.T) {
-	m := press(t, multi(rows("a", "b")...), "space", "space")
+func TestEnterUnticksAgain(t *testing.T) {
+	m := press(t, multi(rows("a", "b")...), "enter", "enter")
 	if got := len(ticked(m)); got != 0 {
 		t.Fatalf("%d rows ticked, want 0", got)
 	}
 }
 
 func TestTicksAccumulateAcrossRows(t *testing.T) {
-	m := press(t, multi(rows("a", "b", "c")...), "space", "down", "down", "space")
+	m := press(t, multi(rows("a", "b", "c")...), "enter", "down", "down", "enter")
 	eq(t, ticked(m), []string{"a", "c"})
 }
 
@@ -50,7 +50,7 @@ func TestSelectAllAndNone(t *testing.T) {
 func TestLockedRowsStartTickedAndCannotBeUnticked(t *testing.T) {
 	m := multi(Row{Key: "a", Cols: []string{"a"}, Locked: true})
 	eq(t, ticked(m), []string{"a"})
-	m = press(t, m, "space")
+	m = press(t, m, "enter")
 	eq(t, ticked(m), []string{"a"}) // still ticked
 }
 
@@ -68,7 +68,7 @@ func TestTickAllKeysDoNotEditTheQuery(t *testing.T) {
 	if string(m.query) != "al" || m.qpos != 2 {
 		t.Fatalf("query %q qpos %d, want al/2 — ctrl+a is no longer home", string(m.query), m.qpos)
 	}
-	eq(t, ticked(m), []string{"alpha", "beta"})
+	eq(t, ticked(m), []string{"alpha"}) // beta is filtered out
 	m = press(t, m, "ctrl+x")
 	if string(m.query) != "al" {
 		t.Fatalf("query %q, want al", string(m.query))
@@ -80,7 +80,7 @@ func TestTickAllKeysDoNotEditTheQuery(t *testing.T) {
 
 func TestTogglingWhileFilteredTicksTheRowYouSee(t *testing.T) {
 	m := multi(rows("alpha", "beta", "gamma")...)
-	m = press(t, m, "gam", "space")
+	m = press(t, m, "gam", "enter")
 	eq(t, ticked(m), []string{"gamma"})
 }
 
@@ -88,10 +88,10 @@ func TestFilteringNeverChangesWhatIsTicked(t *testing.T) {
 	// The bug this guards: narrowing the view must not drop ticks for rows the
 	// filter is hiding, or a filter silently unselects things.
 	m := multi(rows("alpha", "beta", "gamma")...)
-	m = press(t, m, "space") // tick alpha
+	m = press(t, m, "enter") // tick alpha
 	m = press(t, m, "gam")   // hide it
 	eq(t, ticked(m), []string{"alpha"})
-	m = press(t, m, "space") // also tick gamma
+	m = press(t, m, "enter") // also tick gamma
 	m = press(t, m, "esc")   // unfilter
 	eq(t, ticked(m), []string{"alpha", "gamma"})
 }
@@ -122,7 +122,7 @@ func TestSingleSelectSelectionIsJustTheCursorRow(t *testing.T) {
 func TestTickedIsInRowOrderNotClickOrder(t *testing.T) {
 	// Callers write this straight to config files, so it must be stable.
 	m := multi(rows("a", "b", "c")...)
-	m = press(t, m, "down", "down", "space", "up", "up", "space")
+	m = press(t, m, "down", "down", "enter", "up", "up", "enter")
 	if got := strings.Join(ticked(m), ","); got != "a,c" {
 		t.Fatalf("ticked %q, want %q", got, "a,c")
 	}
@@ -133,5 +133,40 @@ func TestSelectionOnAnEmptyListIsEmpty(t *testing.T) {
 	sel := m.Selection()
 	if sel.Cursor.Key != "" || len(sel.Ticked) != 0 {
 		t.Fatalf("got %+v, want an empty selection", sel)
+	}
+}
+
+func TestSelectAllOnlyTicksVisibleRows(t *testing.T) {
+	m := press(t, multi(rows("alpha", "beta", "gamma")...), "al", "ctrl+a")
+	eq(t, ticked(m), []string{"alpha"})
+	m = press(t, m, "esc")
+	eq(t, ticked(m), []string{"alpha"}) // hidden rows were never touched
+}
+
+func TestSelectNoneOnlyUnticksVisibleRows(t *testing.T) {
+	m := press(t, multi(rows("alpha", "beta", "gamma")...), "ctrl+a")
+	m = press(t, m, "gam", "ctrl+x")
+	eq(t, ticked(m), []string{"alpha", "beta"}) // hidden ticks survive
+	m = press(t, m, "esc")
+	eq(t, ticked(m), []string{"alpha", "beta"})
+}
+
+func TestSelectNoneWhileFilteredKeepsVisibleLockedRows(t *testing.T) {
+	m := multi(
+		Row{Key: "alpha", Cols: []string{"alpha"}, Locked: true},
+		Row{Key: "alpine", Cols: []string{"alpine"}},
+		Row{Key: "beta", Cols: []string{"beta"}, Ticked: true},
+	)
+	m = press(t, m, "al", "ctrl+a", "ctrl+x")
+	eq(t, ticked(m), []string{"alpha", "beta"})
+}
+
+func TestSpaceTypesIntoTheQueryUnderMultiSelect(t *testing.T) {
+	m := press(t, multi(rows("a", "b")...), "space")
+	if string(m.query) != " " {
+		t.Fatalf("query %q, want a single space", string(m.query))
+	}
+	if got := len(ticked(m)); got != 0 {
+		t.Fatalf("%d rows ticked by space, want 0", got)
 	}
 }
