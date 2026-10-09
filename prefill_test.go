@@ -35,9 +35,6 @@ func TestConfigFilterNarrowsBeforeTheFirstKey(t *testing.T) {
 
 func TestConfigFilterLeavesTheKeyboardInTheQuery(t *testing.T) {
 	m := guessed(&acted{})
-	if !m.filtering {
-		t.Fatal("want the query focused so the guess can be corrected")
-	}
 	// Typing continues the query rather than hitting a list binding.
 	eq(t, keys(press(t, m, "-prod")), []string{"web-prod"})
 }
@@ -74,7 +71,7 @@ func TestShowHidesAnActionUntilTheFilterIsTyped(t *testing.T) {
 	if strings.Contains(m.View(), "Create") {
 		t.Fatal("Create is offered with no filter to create from")
 	}
-	if !strings.Contains(press(t, m, "/", "new").View(), "Create") {
+	if !strings.Contains(press(t, m, "new").View(), "Create") {
 		t.Fatal("Create stayed hidden once the filter had text")
 	}
 }
@@ -92,7 +89,7 @@ func TestAHiddenActionIgnoresItsHotkey(t *testing.T) {
 
 func TestAShownActionFiresItsHotkeyWhileFiltering(t *testing.T) {
 	var a acted
-	m := press(t, fixtureWithCreate(&a), "/", "new", "ctrl+n")
+	m := press(t, fixtureWithCreate(&a), "new", "ctrl+n")
 	if m.Result() != "created" {
 		t.Fatalf("got %q, want created", m.Result())
 	}
@@ -104,7 +101,7 @@ func TestAShownActionFiresItsHotkeyWhileFiltering(t *testing.T) {
 func TestOnEmptyActionRunsWithNoMatchingRows(t *testing.T) {
 	var a acted
 	// "zzz" matches none of the rows, which is the whole reason to create.
-	m := press(t, fixtureWithCreate(&a), "/", "zzz", "ctrl+n")
+	m := press(t, fixtureWithCreate(&a), "zzz", "ctrl+n")
 	if m.Result() != "created" {
 		t.Fatalf("got %q, want created", m.Result())
 	}
@@ -118,24 +115,24 @@ func TestOnEmptyActionRunsWithNoMatchingRows(t *testing.T) {
 
 func TestActionWithoutOnEmptyStaysInertWithNoMatchingRows(t *testing.T) {
 	var a acted
-	// Enter has no OnEmpty, so tabbing back and firing it must do nothing.
-	m := press(t, fixtureWithCreate(&a), "/", "zzz", "tab", "enter")
+	// Enter has no OnEmpty, so firing it must do nothing.
+	m := press(t, fixtureWithCreate(&a), "zzz", "enter")
 	if len(a.calls) != 0 || m.Result() != "" {
 		t.Fatalf("Enter ran on an empty list: calls=%d result=%q", len(a.calls), m.Result())
 	}
 }
 
 func TestFocusSkipsHiddenActions(t *testing.T) {
-	// With no filter, Create is hidden: one step right from Enter lands on
+	// With no filter, Create is hidden: one tab from Enter lands on
 	// Exit rather than on the button that is not drawn.
-	m := press(t, fixtureWithCreate(&acted{}), "right")
+	m := press(t, fixtureWithCreate(&acted{}), "tab")
 	if got := m.cfg.Actions[m.button].Label; got != "Exit" {
 		t.Fatalf("focused %q, want Exit", got)
 	}
 }
 
 func TestFocusReachesAnActionTheFilterReveals(t *testing.T) {
-	m := press(t, fixtureWithCreate(&acted{}), "/", "new", "tab", "right")
+	m := press(t, fixtureWithCreate(&acted{}), "new", "tab")
 	if got := m.cfg.Actions[m.button].Label; got != "Create" {
 		t.Fatalf("focused %q, want Create", got)
 	}
@@ -143,7 +140,7 @@ func TestFocusReachesAnActionTheFilterReveals(t *testing.T) {
 
 func TestFocusSlidesOffAnActionTheFilterHides(t *testing.T) {
 	// Focus Create, then clear the query out from under it.
-	m := press(t, fixtureWithCreate(&acted{}), "/", "new", "tab", "right")
+	m := press(t, fixtureWithCreate(&acted{}), "new", "tab")
 	m = press(t, m, "esc")
 	if got := m.cfg.Actions[m.button].Label; got != "Enter" {
 		t.Fatalf("focused %q, want focus to have slid back to Enter", got)
@@ -155,7 +152,7 @@ func TestFocusSlidesOffAnActionTheFilterHides(t *testing.T) {
 
 func TestEnterDoesNotFireAnActionTheFilterJustHid(t *testing.T) {
 	var a acted
-	m := press(t, fixtureWithCreate(&a), "/", "new", "tab", "right")
+	m := press(t, fixtureWithCreate(&a), "new", "tab")
 	m = press(t, m, "esc", "enter")
 	for _, c := range a.calls {
 		if c.Filter == "" && m.Result() == "created" {

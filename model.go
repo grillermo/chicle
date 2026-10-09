@@ -19,9 +19,8 @@ type Model struct {
 	quit   bool
 	result string
 
-	filtering bool   // typing goes to the query instead of the list
-	query     []rune // the filter text, matched against every cell
-	qpos      int    // cursor position within query
+	query []rune // the filter text, matched against every cell
+	qpos  int    // cursor position within query
 
 	button int    // focused action
 	status string // message under the action row
@@ -44,13 +43,12 @@ func New(cfg Config) Model {
 	m.rows = append([]Row(nil), cfg.Rows...)
 	m = m.normaliseLocks()
 
-	// A pre-filled Filter opens the list exactly as "/" plus typing would
-	// leave it, keyboard included: the caller is offering a guess, and the
-	// first thing the user may want is to correct it.
+	// A pre-filled Filter opens the list exactly as typing it would leave it,
+	// cursor at the end: the caller is offering a guess, and the first thing
+	// the user may want is to correct it.
 	if cfg.Filter != "" {
 		m.query = []rune(cfg.Filter)
 		m.qpos = len(m.query)
-		m.filtering = true
 		m = m.queryChanged()
 	}
 	return m.clampButton()
@@ -64,10 +62,6 @@ func (m Model) Result() string { return m.result }
 
 // visibleRows is the rows the filter lets through, in display order.
 func (m Model) visibleRows() []Row { return filtered(m.rows, m.query) }
-
-// showQuery keeps the query line on screen while it holds a filter, so it is
-// never a mystery why rows are missing.
-func (m Model) showQuery() bool { return m.filtering || len(m.query) > 0 }
 
 // CursorRow is the highlighted row, or a zero Row when nothing is visible.
 func (m Model) CursorRow() Row {
@@ -97,42 +91,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return next, nil
 		}
-		if m.filtering {
-			// Printable text goes to the query; everything else is an editing
-			// key. Runes are checked first so "q" and "/" type normally here.
-			if msg.Type == tea.KeyRunes {
-				for _, r := range msg.Runes {
-					m = m.insertRune(r)
-				}
-				return m, nil
+		// Printable text goes to the query, so a bare rune is never a command.
+		if msg.Type == tea.KeyRunes {
+			for _, r := range msg.Runes {
+				m = m.insertRune(r)
 			}
-			if msg.Type == tea.KeySpace {
-				// Space is the tick command even while filtering — a
-				// narrowed-down list is exactly when you want to tick the one
-				// row you searched for, not type a literal space.
-				if m.cfg.MultiSelect {
-					return m.toggleCursor(), nil
-				}
-				return m.insertRune(' '), nil
-			}
-			// Hotkeys still fire while filtering, now that runes have been
-			// dealt with above. An action revealed by the filter would
-			// otherwise be unreachable without leaving the query first, which
-			// is the wrong shape for an action that exists to use the query.
-			if i, ok := m.keyedAction(s); ok {
-				m.button = i
-				next, done := m.activate()
-				if done {
-					return next, tea.Quit
-				}
-				return next, nil
-			}
-			next, quit := m.updateFiltering(s)
-			if quit {
-				return next, tea.Quit
-			}
-			return next, nil
+			return m, nil
 		}
+		if msg.Type == tea.KeySpace {
+			// Space is the tick command under MultiSelect — a narrowed-down
+			// list is exactly when you want to tick the one row you searched
+			// for, not type a literal space.
+			if m.cfg.MultiSelect {
+				return m.toggleCursor(), nil
+			}
+			return m.insertRune(' '), nil
+		}
+		// Hotkeys fire with a query set: an action revealed by the filter
+		// would otherwise be unreachable, and it exists to use the query.
+		// Runes were dealt with above, so only named keys can match.
 		if i, ok := m.keyedAction(s); ok {
 			m.button = i
 			next, done := m.activate()
@@ -142,18 +119,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return next, nil
 		}
 		switch s {
-		case "down", "j":
-			return m.move(1).scrollToCursor(), nil
-		case "up", "k":
-			return m.move(-1).scrollToCursor(), nil
-		case "ctrl+e", "ctrl+f", "pgdown":
-			return m.page(1), nil
-		case "ctrl+b", "pgup":
-			return m.page(-1), nil
-		case "/":
-			m.filtering = true
-			m.qpos = len(m.query)
-			return m, nil
+		case "ctrl+c":
+			m.quit = true
+			return m, tea.Quit
 		case "esc":
 			// A filter on screen is cleared first: quitting and losing the
 			// query to the same keystroke is never what was meant.
@@ -162,31 +130,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.quit = true
 			return m, tea.Quit
-		case "q", "ctrl+c":
-			m.quit = true
-			return m, tea.Quit
-		case "left":
-			return m.moveButton(-1), nil
-		case "right":
+		case "tab":
 			return m.moveButton(1), nil
+		case "shift+tab":
+			return m.moveButton(-1), nil
 		case "enter":
 			next, done := m.activate()
 			if done {
 				return next, tea.Quit
 			}
 			return next, nil
-		case " ", "space", "x":
-			if m.cfg.MultiSelect {
-				return m.toggleCursor(), nil
-			}
-		case "a":
+		case "ctrl+a":
 			if m.cfg.MultiSelect {
 				return m.setAll(true), nil
 			}
-		case "n":
+		case "ctrl+x":
 			if m.cfg.MultiSelect {
 				return m.setAll(false), nil
 			}
+		case "up":
+			return m.move(-1).scrollToCursor(), nil
+		case "down":
+			return m.move(1).scrollToCursor(), nil
+		case "ctrl+e", "ctrl+f", "pgdown":
+			return m.page(1), nil
+		case "ctrl+b", "pgup":
+			return m.page(-1), nil
+		default:
+			return m.editQuery(s), nil
 		}
 	}
 	return m, nil

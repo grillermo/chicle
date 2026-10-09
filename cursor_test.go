@@ -2,18 +2,18 @@ package chicle
 
 import "testing"
 
-func TestArrowsAndJKMoveTheCursor(t *testing.T) {
+func TestArrowsMoveTheCursor(t *testing.T) {
 	m := press(t, fixture("a", "b", "c"), "down")
 	if got := m.CursorRow().Key; got != "b" {
 		t.Fatalf("after down, cursor on %q, want b", got)
 	}
-	m = press(t, m, "j")
+	m = press(t, m, "down")
 	if got := m.CursorRow().Key; got != "c" {
-		t.Fatalf("after j, cursor on %q, want c", got)
+		t.Fatalf("after down, cursor on %q, want c", got)
 	}
-	m = press(t, m, "up", "k")
+	m = press(t, m, "up", "up")
 	if got := m.CursorRow().Key; got != "a" {
-		t.Fatalf("after up+k, cursor on %q, want a", got)
+		t.Fatalf("after up+up, cursor on %q, want a", got)
 	}
 }
 
@@ -47,7 +47,7 @@ func TestNoCycleClampsAtBothEnds(t *testing.T) {
 
 func TestMovingAnEmptyListIsInert(t *testing.T) {
 	m := New(Config{Columns: []Column{{Title: "N"}}})
-	m = press(t, m, "down", "up", "j", "k") // must not panic or divide by zero
+	m = press(t, m, "down", "up") // must not panic or divide by zero
 	if got := m.CursorRow().Key; got != "" {
 		t.Fatalf("cursor on %q, want empty", got)
 	}

@@ -1,6 +1,7 @@
 package chicle
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -124,10 +125,14 @@ func TestPageKeysAliases(t *testing.T) {
 	}
 }
 
-func TestCtrlEStillEndsTheQueryWhileFiltering(t *testing.T) {
-	m := press(t, twenty(t), "/", "ab", "ctrl+a", "ctrl+e")
-	if m.qpos != 2 || m.cursor != 0 {
-		t.Fatalf("qpos = %d, cursor = %d; ctrl+e must stay end-of-query while filtering", m.qpos, m.cursor)
+func TestCtrlEPagesEvenWithAQuery(t *testing.T) {
+	names := make([]string, 20)
+	for i := range names {
+		names[i] = fmt.Sprintf("row%02d", i)
+	}
+	m := press(t, resize(t, fixture(names...), 80, 11), "r", "ctrl+e")
+	if m.qpos != 1 || m.cursor == 0 {
+		t.Fatalf("qpos = %d, cursor = %d; ctrl+e must page, not move the query cursor", m.qpos, m.cursor)
 	}
 }
 

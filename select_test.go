@@ -39,9 +39,9 @@ func TestTicksAccumulateAcrossRows(t *testing.T) {
 }
 
 func TestSelectAllAndNone(t *testing.T) {
-	m := press(t, multi(rows("a", "b", "c")...), "a")
+	m := press(t, multi(rows("a", "b", "c")...), "ctrl+a")
 	eq(t, ticked(m), []string{"a", "b", "c"})
-	m = press(t, m, "n")
+	m = press(t, m, "ctrl+x")
 	if got := len(ticked(m)); got != 0 {
 		t.Fatalf("%d rows ticked after none, want 0", got)
 	}
@@ -59,13 +59,28 @@ func TestNoneKeepsLockedRowsTicked(t *testing.T) {
 		Row{Key: "a", Cols: []string{"a"}, Locked: true},
 		Row{Key: "b", Cols: []string{"b"}},
 	)
-	m = press(t, m, "a", "n")
+	m = press(t, m, "ctrl+a", "ctrl+x")
 	eq(t, ticked(m), []string{"a"})
+}
+
+func TestTickAllKeysDoNotEditTheQuery(t *testing.T) {
+	m := press(t, multi(rows("alpha", "beta")...), "al", "ctrl+a")
+	if string(m.query) != "al" || m.qpos != 2 {
+		t.Fatalf("query %q qpos %d, want al/2 — ctrl+a is no longer home", string(m.query), m.qpos)
+	}
+	eq(t, ticked(m), []string{"alpha", "beta"})
+	m = press(t, m, "ctrl+x")
+	if string(m.query) != "al" {
+		t.Fatalf("query %q, want al", string(m.query))
+	}
+	if got := len(ticked(m)); got != 0 {
+		t.Fatalf("%d rows ticked after ctrl+x, want 0", got)
+	}
 }
 
 func TestTogglingWhileFilteredTicksTheRowYouSee(t *testing.T) {
 	m := multi(rows("alpha", "beta", "gamma")...)
-	m = press(t, m, "/", "gam", "space")
+	m = press(t, m, "gam", "space")
 	eq(t, ticked(m), []string{"gamma"})
 }
 
@@ -73,8 +88,8 @@ func TestFilteringNeverChangesWhatIsTicked(t *testing.T) {
 	// The bug this guards: narrowing the view must not drop ticks for rows the
 	// filter is hiding, or a filter silently unselects things.
 	m := multi(rows("alpha", "beta", "gamma")...)
-	m = press(t, m, "space")    // tick alpha
-	m = press(t, m, "/", "gam") // hide it
+	m = press(t, m, "space") // tick alpha
+	m = press(t, m, "gam")   // hide it
 	eq(t, ticked(m), []string{"alpha"})
 	m = press(t, m, "space") // also tick gamma
 	m = press(t, m, "esc")   // unfilter
@@ -82,11 +97,14 @@ func TestFilteringNeverChangesWhatIsTicked(t *testing.T) {
 }
 
 func TestSingleSelectHasNoTickKeys(t *testing.T) {
-	// Without MultiSelect, "a" and "n" are not commands — and space does
-	// nothing, because there is nothing to tick.
-	m := press(t, fixture("alpha", "beta"), "a", "space")
+	// Without MultiSelect, ctrl+a and ctrl+x tick nothing, and space types a
+	// space instead.
+	m := press(t, fixture("alpha", "beta"), "ctrl+a", "ctrl+x", "space")
 	if got := len(ticked(m)); got != 1 {
 		t.Fatalf("%d rows in Ticked, want 1 (the cursor row)", got)
+	}
+	if string(m.query) != " " {
+		t.Fatalf("query %q, want a single space", string(m.query))
 	}
 }
 

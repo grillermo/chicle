@@ -57,7 +57,7 @@ func TestTheCursorFallsBackWhenItsRowDisappears(t *testing.T) {
 }
 
 func TestUpdatesKeepTheFilter(t *testing.T) {
-	m := press(t, withUpdates(nil), "/", "a")
+	m := press(t, withUpdates(nil), "a")
 	m = deliver(t, m, rows("apple", "beta", "apex"))
 	eq(t, keys(m), []string{"apple", "beta", "apex"}) // all contain "a"
 	m = press(t, m, "p")

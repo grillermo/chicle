@@ -41,7 +41,6 @@ func (m Model) queryChanged() Model {
 }
 
 func (m Model) clearFilter() Model {
-	m.filtering = false
 	m.query = nil
 	m.qpos = 0
 	return m.queryChanged()
@@ -83,53 +82,30 @@ func (m Model) deleteWord() Model {
 	return m.queryChanged()
 }
 
-// updateFiltering handles keys while the query line has the keyboard. The list
-// still scrolls with up/down, because left/right belong to the query here.
-func (m Model) updateFiltering(k string) (Model, bool) {
+// editQuery handles the keys that edit or move within the query. Anything
+// else is ignored.
+func (m Model) editQuery(k string) Model {
 	switch k {
-	case "ctrl+c":
-		m.quit = true
-		return m, true
-	case "esc":
-		return m.clearFilter(), false
-	case "tab":
-		m.filtering = false
-		return m, false
-	case "up":
-		return m.move(-1).scrollToCursor(), false
-	case "down":
-		return m.move(1).scrollToCursor(), false
-	case "pgdown", "ctrl+f":
-		return m.page(1), false
-	case "pgup", "ctrl+b":
-		return m.page(-1), false
 	case "left":
 		if m.qpos > 0 {
 			m.qpos--
 		}
-		return m, false
 	case "right":
 		if m.qpos < len(m.query) {
 			m.qpos++
 		}
-		return m, false
-	case "ctrl+a":
+	case "home":
 		m.qpos = 0
-		return m, false
-	case "ctrl+e":
+	case "end":
 		m.qpos = len(m.query)
-		return m, false
 	case "backspace":
-		return m.deleteBack(), false
+		return m.deleteBack()
 	case "ctrl+w":
-		return m.deleteWord(), false
+		return m.deleteWord()
 	case "ctrl+u":
 		m.query = nil
 		m.qpos = 0
-		return m.queryChanged(), false
-	case "enter":
-		next, _ := m.activate()
-		return next, next.quit
+		return m.queryChanged()
 	}
-	return m, false
+	return m
 }

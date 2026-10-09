@@ -87,13 +87,22 @@ func (m Model) drawButton(label string, focused bool) string {
 	return "[ " + label + " ]"
 }
 
+// queryCursor marks the insertion point in the query line.
+const queryCursor = "▏"
+
+// queryLine is always on screen, so it is never a mystery why rows are
+// missing, and an empty one doubles as the hint that typing filters.
 func (m Model) queryLine() string {
-	return m.styles.dim.Render("/ ") + string(m.query)
+	prompt := m.styles.dim.Render("filter: ")
+	if len(m.query) == 0 {
+		return prompt + queryCursor + m.styles.dim.Render("type to filter")
+	}
+	return prompt + string(m.query[:m.qpos]) + queryCursor + string(m.query[m.qpos:])
 }
 
-// keyHints advertises the shown actions that carry a hotkey. It matters most
-// while filtering: left and right belong to the query there, so a hotkey is
-// the only way to fire an action without leaving the text behind.
+// keyHints advertises the shown actions that carry a hotkey. They matter
+// because the arrows belong to the query, so a hotkey is the only way to fire
+// an action without tabbing to its button first.
 func (m Model) keyHints() []string {
 	var out []string
 	for _, i := range m.shownActions() {
@@ -104,16 +113,10 @@ func (m Model) keyHints() []string {
 	return out
 }
 
-// hint is the key legend. It changes with the mode: there is no point offering
-// [a]/[n] while runes are going into the query.
+// hint is the key legend.
 func (m Model) hint() string {
 	if m.confirming {
 		return "[←] yes   [→] no   [enter] answer   [esc] cancel"
-	}
-	if m.filtering {
-		parts := []string{"[esc] clear filter", "[ctrl+w] delete word"}
-		parts = append(parts, m.keyHints()...)
-		return strings.Join(append(parts, "[tab] back to list", "[enter] go"), "   ")
 	}
 	parts := []string{"[↑↓] move"}
 	if above, below := m.offscreen(); above+below > 0 {
@@ -121,9 +124,18 @@ func (m Model) hint() string {
 		parts = append(parts, "[^e ^b] page")
 	}
 	if m.cfg.MultiSelect {
-		parts = append(parts, "[space] toggle", "[a] all", "[n] none")
+		parts = append(parts, "[space] toggle", "[^a] all", "[^x] none")
 	}
-	parts = append(parts, "[/] filter", "[enter] go", "[q] quit")
+	parts = append(parts, m.keyHints()...)
+	if len(m.cfg.Actions) > 1 {
+		parts = append(parts, "[tab] next button")
+	}
+	if len(m.query) > 0 {
+		parts = append(parts, "[esc] clear filter", "[^w] delete word")
+	} else {
+		parts = append(parts, "[esc] quit")
+	}
+	parts = append(parts, "[enter] go")
 	return strings.Join(parts, "   ")
 }
 
@@ -133,9 +145,7 @@ func (m Model) View() string {
 	if m.cfg.Title != "" {
 		b.WriteString(m.styles.title.Render(m.cfg.Title) + "\n")
 	}
-	if m.showQuery() {
-		b.WriteString(m.clamp(m.queryLine()) + "\n")
-	}
+	b.WriteString(m.clamp(m.queryLine()) + "\n")
 
 	switch {
 	case len(m.rows) == 0:

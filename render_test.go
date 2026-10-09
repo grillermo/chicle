@@ -29,7 +29,7 @@ func TestViewShowsEveryVisibleRow(t *testing.T) {
 }
 
 func TestViewHidesFilteredOutRows(t *testing.T) {
-	m := press(t, resize(t, fixture("alpha", "beta"), 80, tallEnough), "/", "alph")
+	m := press(t, resize(t, fixture("alpha", "beta"), 80, tallEnough), "alph")
 	v := view(t, m)
 	if strings.Contains(v, "beta") {
 		t.Fatalf("filtered-out row still drawn:\n%s", v)
@@ -37,17 +37,27 @@ func TestViewHidesFilteredOutRows(t *testing.T) {
 }
 
 func TestViewShowsTheQueryLine(t *testing.T) {
-	m := press(t, resize(t, fixture("alpha"), 80, tallEnough), "/", "alp")
+	m := press(t, resize(t, fixture("alpha"), 80, tallEnough), "alp")
 	if v := view(t, m); !strings.Contains(v, "alp") {
 		t.Fatalf("query not drawn:\n%s", v)
 	}
 }
 
-func TestTheQueryLineStaysAfterLeavingFilterMode(t *testing.T) {
-	// Otherwise it is a mystery why rows are missing.
-	m := press(t, resize(t, fixture("alpha", "beta"), 80, tallEnough), "/", "alp", "tab")
-	if v := view(t, m); !strings.Contains(v, "alp") {
-		t.Fatalf("query line vanished after tab:\n%s", v)
+func TestAnEmptyQueryShowsAPlaceholder(t *testing.T) {
+	// Nothing else tells the user they can just type.
+	m := resize(t, fixture("alpha"), 80, tallEnough)
+	if v := view(t, m); !strings.Contains(v, "type to filter") {
+		t.Fatalf("no placeholder on an empty query:\n%s", v)
+	}
+	if v := view(t, press(t, m, "alp")); strings.Contains(v, "type to filter") {
+		t.Fatalf("placeholder still drawn over a query:\n%s", v)
+	}
+}
+
+func TestTheQueryLineShowsACursor(t *testing.T) {
+	m := press(t, resize(t, fixture("alpha"), 80, tallEnough), "alp")
+	if v := view(t, m); !strings.Contains(v, "alp"+queryCursor) {
+		t.Fatalf("no cursor after the query:\n%s", v)
 	}
 }
 
@@ -133,7 +143,7 @@ func TestEmptyListSaysSoDistinctly(t *testing.T) {
 func TestAFilterMatchingNothingSaysSomethingElse(t *testing.T) {
 	// "nothing here" and "nothing matches" are different problems with
 	// different fixes, so they must not share a message.
-	m := press(t, resize(t, fixture("a", "b"), 80, tallEnough), "/", "zzz")
+	m := press(t, resize(t, fixture("a", "b"), 80, tallEnough), "zzz")
 	v := view(t, m)
 	if !strings.Contains(v, "No rows match") {
 		t.Fatalf("no no-match message:\n%s", v)
@@ -143,14 +153,24 @@ func TestAFilterMatchingNothingSaysSomethingElse(t *testing.T) {
 	}
 }
 
-func TestTheHelpLegendChangesWithTheMode(t *testing.T) {
-	base := view(t, resize(t, multi(rows("a")...), 80, tallEnough))
-	if !strings.Contains(base, "filter") {
-		t.Fatalf("no filter hint in the list legend:\n%s", base)
+func TestTheHelpLegendHasNoRetiredKeys(t *testing.T) {
+	h := resize(t, multi(rows("a")...), 80, tallEnough).hint()
+	for _, gone := range []string{"[/]", "[q]", "[a]", "[n]"} {
+		if strings.Contains(h, gone) {
+			t.Fatalf("legend offers %s, which is no longer a command:\n%s", gone, h)
+		}
 	}
-	filtering := view(t, press(t, resize(t, multi(rows("a")...), 80, tallEnough), "/"))
-	if !strings.Contains(filtering, "clear filter") {
-		t.Fatalf("legend did not change for filter mode:\n%s", filtering)
+	for _, want := range []string{"[space] toggle", "[^a] all", "[^x] none", "[esc]"} {
+		if !strings.Contains(h, want) {
+			t.Fatalf("legend lacks %s:\n%s", want, h)
+		}
+	}
+}
+
+func TestTheLegendOnlyOffersTickKeysUnderMultiSelect(t *testing.T) {
+	h := resize(t, fixture("a"), 80, tallEnough).hint()
+	if strings.Contains(h, "toggle") || strings.Contains(h, "[^a]") {
+		t.Fatalf("single-select legend offers tick keys:\n%s", h)
 	}
 }
 

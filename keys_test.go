@@ -21,6 +21,8 @@ func key(s string) tea.KeyMsg {
 		"ctrl+b": tea.KeyCtrlB, "ctrl+f": tea.KeyCtrlF,
 		"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown,
 		"f2": tea.KeyF2, "f9": tea.KeyF9,
+		"home": tea.KeyHome, "end": tea.KeyEnd,
+		"shift+tab": tea.KeyShiftTab, "ctrl+x": tea.KeyCtrlX,
 	}
 	if t, ok := named[s]; ok {
 		return tea.KeyMsg{Type: t}
@@ -30,7 +32,7 @@ func key(s string) tea.KeyMsg {
 
 // press feeds keys to the model in order and returns the model afterwards.
 // Multi-character arguments that are not key names are typed one rune at a
-// time, so press(m, "/", "foo") types f, o, o.
+// time, so press(m, "foo") types f, o, o.
 func press(t *testing.T, m Model, keys ...string) Model {
 	t.Helper()
 	for _, k := range keys {
@@ -41,7 +43,8 @@ func press(t *testing.T, m Model, keys ...string) Model {
 			"backspace": true, "ctrl+c": true, "ctrl+w": true,
 			"ctrl+a": true, "ctrl+e": true, "ctrl+u": true, "ctrl+n": true,
 			"ctrl+b": true, "ctrl+f": true, "pgup": true, "pgdown": true,
-			"f2": true, "f9": true,
+			"f2": true, "f9": true, "home": true, "end": true,
+			"shift+tab": true, "ctrl+x": true,
 		}[k]; !named && len([]rune(k)) > 1 {
 			msgs = nil
 			for _, r := range k {

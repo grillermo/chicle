@@ -57,7 +57,7 @@ func TestLeftRightMoveBetweenActions(t *testing.T) {
 		Action{Label: "Open", Run: open.run(Outcome{Done: true})},
 		Action{Label: "Delete", Run: del.run(Outcome{Done: true})},
 	)
-	m = press(t, m, "right", "enter")
+	m = press(t, m, "tab", "enter")
 	if len(del.calls) != 1 || len(open.calls) != 0 {
 		t.Fatalf("ran open=%d delete=%d, want open=0 delete=1", len(open.calls), len(del.calls))
 	}
@@ -68,11 +68,11 @@ func TestActionFocusClampsAtBothEnds(t *testing.T) {
 		Action{Label: "One", Run: (&acted{}).run(Outcome{})},
 		Action{Label: "Two", Run: (&acted{}).run(Outcome{})},
 	)
-	m = press(t, m, "left")
+	m = press(t, m, "shift+tab")
 	if m.button != 0 {
-		t.Fatalf("button %d after left at the start, want 0 — actions must not cycle", m.button)
+		t.Fatalf("button %d after shift+tab at the start, want 0 — actions must not cycle", m.button)
 	}
-	m = press(t, m, "right", "right", "right")
+	m = press(t, m, "tab", "tab", "tab")
 	if m.button != 1 {
 		t.Fatalf("button %d, want 1 — actions must clamp at the end", m.button)
 	}
@@ -90,7 +90,7 @@ func TestActionReceivesTheCursorRow(t *testing.T) {
 func TestActionReceivesTheFilteredCursorRow(t *testing.T) {
 	var a acted
 	m := withActions(Action{Label: "Go", Run: a.run(Outcome{Done: true})})
-	press(t, m, "/", "c", "enter")
+	press(t, m, "c", "enter")
 	if got := a.calls[0].Cursor.Key; got != "c" {
 		t.Fatalf("action got cursor %q, want c", got)
 	}
@@ -101,7 +101,7 @@ func TestNilRunEndsThePickerWithNoResult(t *testing.T) {
 		Action{Label: "Go", Run: (&acted{}).run(Outcome{Done: true, Result: "x"})},
 		Action{Label: "Exit"}, // no Run
 	)
-	m = press(t, m, "right", "enter")
+	m = press(t, m, "tab", "enter")
 	if !m.quit {
 		t.Fatal("the bare Exit button did not finish the picker")
 	}
@@ -113,7 +113,7 @@ func TestNilRunEndsThePickerWithNoResult(t *testing.T) {
 func TestActionsAreInertWhenNothingMatchesTheFilter(t *testing.T) {
 	var a acted
 	m := withActions(Action{Label: "Go", Run: a.run(Outcome{Done: true})})
-	m = press(t, m, "/", "nonesuch", "enter")
+	m = press(t, m, "nonesuch", "enter")
 	if len(a.calls) != 0 {
 		t.Fatal("action ran with no row under the cursor")
 	}
@@ -272,7 +272,7 @@ func TestReloadKeepsTheFilter(t *testing.T) {
 		Actions: []Action{{Label: "Go", Run: (&acted{}).run(Outcome{Status: "ok"})}},
 		Reload:  func() ([]Row, error) { return rows("alpha", "beta", "alpine"), nil },
 	})
-	m = press(t, m, "/", "alp", "enter")
+	m = press(t, m, "alp", "enter")
 	eq(t, keys(m), []string{"alpha", "alpine"})
 }
 
@@ -317,7 +317,7 @@ func TestKeyedActionFiresWithoutFocus(t *testing.T) {
 		Action{Label: "Delete", Key: "f2", Run: del.run(Outcome{Done: true})},
 	)
 	// The focused button is still "Open" (button 0); f2 must fire Delete
-	// anyway, with no left/right needed first.
+	// anyway, with no tab needed first.
 	m = press(t, m, "f2")
 	if len(del.calls) != 1 || len(open.calls) != 0 {
 		t.Fatalf("ran open=%d delete=%d, want open=0 delete=1", len(open.calls), len(del.calls))
@@ -377,5 +377,57 @@ func TestTwoActionsSharingAKeyIsLastWins(t *testing.T) {
 	m = press(t, m, "f2")
 	if len(first.calls) != 0 || len(second.calls) != 1 {
 		t.Fatalf("ran first=%d second=%d, want first=0 second=1 (last Key match wins)", len(first.calls), len(second.calls))
+	}
+}
+
+func TestShiftTabMovesTheButtonBack(t *testing.T) {
+	m := withActions(
+		Action{Label: "One", Run: (&acted{}).run(Outcome{})},
+		Action{Label: "Two", Run: (&acted{}).run(Outcome{})},
+	)
+	m = press(t, m, "tab")
+	if m.button != 1 {
+		t.Fatalf("button %d after tab, want 1", m.button)
+	}
+	m = press(t, m, "shift+tab")
+	if m.button != 0 {
+		t.Fatalf("button %d after shift+tab, want 0", m.button)
+	}
+}
+
+func TestLeftRightLeaveTheButtonsAlone(t *testing.T) {
+	m := withActions(
+		Action{Label: "One", Run: (&acted{}).run(Outcome{})},
+		Action{Label: "Two", Run: (&acted{}).run(Outcome{})},
+	)
+	m = press(t, m, "right")
+	if m.button != 0 {
+		t.Fatalf("button %d after right, want 0 — arrows belong to the query", m.button)
+	}
+}
+
+func TestARuneKeyNeverFires(t *testing.T) {
+	// A bare rune is text now, so an Action.Key of "x" is unreachable and must
+	// not steal the keystroke from the query.
+	var a acted
+	m := withActions(Action{Label: "Go", Key: "x", Run: a.run(Outcome{Done: true})})
+	m = press(t, m, "x")
+	if len(a.calls) != 0 || m.quit {
+		t.Fatal("a rune Key fired its action")
+	}
+	if string(m.query) != "x" {
+		t.Fatalf("query %q, want x", string(m.query))
+	}
+}
+
+func TestANamedKeyStillFiresWhileAQueryIsSet(t *testing.T) {
+	var a acted
+	m := withActions(Action{Label: "Go", Key: "f2", Run: a.run(Outcome{Done: true})})
+	m = press(t, m, "a", "f2")
+	if len(a.calls) != 1 || !m.quit {
+		t.Fatalf("f2 ran the action %d times, want 1", len(a.calls))
+	}
+	if got := a.calls[0].Filter; got != "a" {
+		t.Fatalf("action got filter %q, want a", got)
 	}
 }
