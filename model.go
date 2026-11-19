@@ -94,6 +94,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // updateKey routes a keystroke: the confirm prompt has the keyboard while it
 // is up, then the query while filtering, then the list.
 func (m Model) updateKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// A fast typist or a paste can deliver several runes in one message. On
+	// the list each one is its own command, and once one of them is "/" the
+	// rest is the start of the query.
+	if !m.confirming && !m.filtering && msg.Type == tea.KeyRunes && !msg.Alt && len(msg.Runes) > 1 {
+		for i, r := range msg.Runes {
+			if m.filtering {
+				return m.insertRunes(msg.Runes[i:]), nil
+			}
+			var cmd tea.Cmd
+			if m, cmd = m.updateKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}); cmd != nil || m.confirming {
+				return m, cmd // quit, or a prompt that the rest must not answer
+			}
+		}
+		return m, nil
+	}
 	s := msg.String()
 	if m.confirming {
 		return quitIf(m.updateConfirm(s))

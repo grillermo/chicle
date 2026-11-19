@@ -244,3 +244,21 @@ func TestAltRunesAreNotInserted(t *testing.T) {
 		t.Fatalf("query %q quit %v, want alt+x ignored", string(m.query), m.quit)
 	}
 }
+
+func TestSlashAndTextInOneReadStartsFilteringWithTheRest(t *testing.T) {
+	// Fast typing or a paste can deliver "/ch" as one message.
+	m := send(t, table(), tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j/we")})
+	if !m.filtering || string(m.query) != "we" {
+		t.Fatalf("filtering %v query %q, want filtering on %q", m.filtering, string(m.query), "we")
+	}
+	if m.cursor != 0 {
+		t.Fatalf("cursor %d, want 0 — j moved, then the query reset it", m.cursor)
+	}
+}
+
+func TestRunesInOneReadActOneByOneOnTheList(t *testing.T) {
+	next, cmd := table().Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jjq")})
+	if m := next.(Model); !m.quit || cmd == nil {
+		t.Fatalf("quit %v cmd %v, want q to quit after two moves", m.quit, cmd)
+	}
+}
