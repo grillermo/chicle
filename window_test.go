@@ -130,7 +130,7 @@ func TestCtrlEPagesEvenWithAQuery(t *testing.T) {
 	for i := range names {
 		names[i] = fmt.Sprintf("row%02d", i)
 	}
-	m := press(t, resize(t, fixture(names...), 80, 11), "r", "ctrl+e")
+	m := press(t, resize(t, fixture(names...), 80, 11), "/", "r", "ctrl+e")
 	if m.qpos != 1 || m.cursor == 0 {
 		t.Fatalf("qpos = %d, cursor = %d; ctrl+e must page, not move the query cursor", m.qpos, m.cursor)
 	}

@@ -65,18 +65,18 @@ func TestLeftRightMoveBetweenActions(t *testing.T) {
 	}
 }
 
-func TestActionFocusClampsAtBothEnds(t *testing.T) {
+func TestTabWrapsAroundTheActions(t *testing.T) {
 	m := withActions(
 		Action{Label: "One", Run: (&acted{}).run(Outcome{})},
 		Action{Label: "Two", Run: (&acted{}).run(Outcome{})},
 	)
 	m = press(t, m, "shift+tab")
-	if m.button != 0 {
-		t.Fatalf("button %d after shift+tab at the start, want 0 — actions must not cycle", m.button)
-	}
-	m = press(t, m, "tab", "tab", "tab")
 	if m.button != 1 {
-		t.Fatalf("button %d, want 1 — actions must clamp at the end", m.button)
+		t.Fatalf("button %d after shift+tab at the start, want 1 — tab wraps", m.button)
+	}
+	m = press(t, m, "tab")
+	if m.button != 0 {
+		t.Fatalf("button %d after tab at the end, want 0 — tab wraps", m.button)
 	}
 }
 
@@ -92,7 +92,7 @@ func TestActionReceivesTheCursorRow(t *testing.T) {
 func TestActionReceivesTheFilteredCursorRow(t *testing.T) {
 	var a acted
 	m := withActions(Action{Label: "Go", Run: a.run(Outcome{Done: true})})
-	press(t, m, "c", "enter")
+	press(t, m, "/", "c", "enter")
 	if got := a.calls[0].Cursor.Key; got != "c" {
 		t.Fatalf("action got cursor %q, want c", got)
 	}
@@ -115,7 +115,7 @@ func TestNilRunEndsThePickerWithNoResult(t *testing.T) {
 func TestActionsAreInertWhenNothingMatchesTheFilter(t *testing.T) {
 	var a acted
 	m := withActions(Action{Label: "Go", Run: a.run(Outcome{Done: true})})
-	m = press(t, m, "nonesuch", "enter")
+	m = press(t, m, "/", "nonesuch", "enter")
 	if len(a.calls) != 0 {
 		t.Fatal("action ran with no row under the cursor")
 	}
@@ -274,7 +274,7 @@ func TestReloadKeepsTheFilter(t *testing.T) {
 		Actions: []Action{{Label: "Go", Run: (&acted{}).run(Outcome{Status: "ok"})}},
 		Reload:  func() ([]Row, error) { return rows("alpha", "beta", "alpine"), nil },
 	})
-	m = press(t, m, "alp", "enter")
+	m = press(t, m, "/", "alp", "enter")
 	eq(t, keys(m), []string{"alpha", "alpine"})
 }
 
@@ -408,24 +408,26 @@ func TestLeftRightLeaveTheButtonsAlone(t *testing.T) {
 	}
 }
 
-func TestARuneKeyNeverFires(t *testing.T) {
-	// A bare rune is text now, so an Action.Key of "x" is unreachable and must
-	// not steal the keystroke from the query.
+func TestARuneKeyFiresFromTheListButTypesWhileFiltering(t *testing.T) {
 	var a acted
-	m := withActions(Action{Label: "Go", Key: "x", Run: a.run(Outcome{Done: true})})
+	m := withActions(Action{Label: "Go", Key: "x", Run: a.run(Outcome{Status: "went"})})
 	m = press(t, m, "x")
-	if len(a.calls) != 0 || m.quit {
-		t.Fatal("a rune Key fired its action")
+	if len(a.calls) != 1 {
+		t.Fatalf("x ran the action %d times from the list, want 1", len(a.calls))
+	}
+	m = press(t, m, "/", "x")
+	if len(a.calls) != 1 {
+		t.Fatal("a rune Key fired while filtering")
 	}
 	if string(m.query) != "x" {
 		t.Fatalf("query %q, want x", string(m.query))
 	}
 }
 
-func TestANamedKeyStillFiresWhileAQueryIsSet(t *testing.T) {
+func TestANamedKeyStillFiresWhileFiltering(t *testing.T) {
 	var a acted
 	m := withActions(Action{Label: "Go", Key: "f2", Run: a.run(Outcome{Done: true})})
-	m = press(t, m, "a", "f2")
+	m = press(t, m, "/", "a", "f2")
 	if len(a.calls) != 1 || !m.quit {
 		t.Fatalf("f2 ran the action %d times, want 1", len(a.calls))
 	}
@@ -459,174 +461,42 @@ func multiActions(a *acted) Model {
 	})
 }
 
-func TestMultiSelectFocusStartsOnTheList(t *testing.T) {
-	m := multiActions(&acted{})
-	if m.button != onList {
-		t.Fatalf("button %d, want the list focused", m.button)
-	}
-}
-
-func TestEnterOnTheListTogglesInsteadOfRunning(t *testing.T) {
+func TestSpaceTicksAndEnterRunsTheHighlightedAction(t *testing.T) {
 	a := &acted{}
-	m := press(t, multiActions(a), "enter", "down", "enter")
+	m := press(t, multiActions(a), "space", "down", "space")
 	eq(t, ticked(m), []string{"a", "b"})
 	if len(a.calls) != 0 || m.quit {
-		t.Fatalf("enter on the list ran an action: calls %d quit %v", len(a.calls), m.quit)
-	}
-	m = press(t, m, "up", "enter")
-	eq(t, ticked(m), []string{"b"})
-}
-
-func TestEnterOnAButtonRunsIt(t *testing.T) {
-	a := &acted{}
-	m := press(t, multiActions(a), "enter", "tab", "enter")
-	if m.button != 0 || !m.quit || m.Result() != "went" {
-		t.Fatalf("button %d quit %v result %q, want the first action run", m.button, m.quit, m.Result())
-	}
-	eq(t, ticked(m), []string{"a"}) // enter on the button did not toggle
-	if len(a.calls) != 1 {
-		t.Fatalf("%d calls, want 1", len(a.calls))
-	}
-}
-
-func TestTabWalksFromTheListThroughTheButtonsAndClamps(t *testing.T) {
-	m := multiActions(&acted{})
-	m = press(t, m, "shift+tab")
-	if m.button != onList {
-		t.Fatalf("button %d after shift+tab on the list, want to stay", m.button)
-	}
-	for i, want := range []int{0, 1, 1} {
-		m = press(t, m, "tab")
-		if m.button != want {
-			t.Fatalf("tab %d: button %d, want %d", i+1, m.button, want)
-		}
-	}
-	for i, want := range []int{0, onList, onList} {
-		m = press(t, m, "shift+tab")
-		if m.button != want {
-			t.Fatalf("shift+tab %d: button %d, want %d", i+1, m.button, want)
-		}
-	}
-}
-
-func TestHotkeyFiresFromTheListAndReturnsFocus(t *testing.T) {
-	a := &acted{}
-	m := press(t, multiActions(a), "enter", "ctrl+n")
-	if len(a.calls) != 1 || m.button != onList {
-		t.Fatalf("calls %d button %d, want the hotkey action run and focus back on the list", len(a.calls), m.button)
-	}
-	eq(t, ticked(m), []string{"a"})
-	if got := a.calls[0].Ticked; len(got) != 1 || got[0].Key != "a" {
-		t.Fatalf("action saw ticked %v, want [a]", got)
-	}
-}
-
-func TestListFocusSurvivesTheButtonsHiding(t *testing.T) {
-	m := New(Config{
-		Columns:     []Column{{Title: "N"}},
-		Rows:        rows("alpha", "beta"),
-		MultiSelect: true,
-		Actions: []Action{
-			{Label: "Go", Run: func(Selection) Outcome { return Outcome{Done: true} }},
-			{Label: "Use", Show: func(s Selection) bool { return s.Filter != "" },
-				Run: func(Selection) Outcome { return Outcome{Done: true} }},
-		},
-	})
-	m = press(t, m, "al", "esc")
-	if m.button != onList {
-		t.Fatalf("button %d, want focus to stay on the list", m.button)
-	}
-	// A focused button that gets hidden still slides to the nearest shown one.
-	m = press(t, m, "al", "tab", "tab", "esc")
-	if m.button != 0 {
-		t.Fatalf("button %d, want focus to slide to 0", m.button)
-	}
-}
-
-func TestSingleSelectKeepsAButtonFocusedAndEnterRunsIt(t *testing.T) {
-	a := &acted{}
-	m := withActions(Action{Label: "Go", Run: a.run(Outcome{Done: true, Result: "x"})})
-	if m.button != 0 {
-		t.Fatalf("button %d, want 0", m.button)
-	}
-	m = press(t, m, "shift+tab")
-	if m.button != 0 {
-		t.Fatalf("button %d after shift+tab, want 0 — no list focus without MultiSelect", m.button)
+		t.Fatalf("space ran an action: calls %d quit %v", len(a.calls), m.quit)
 	}
 	m = press(t, m, "enter")
-	if m.Result() != "x" {
-		t.Fatalf("result %q, want x", m.Result())
+	if !m.quit || m.Result() != "went" {
+		t.Fatalf("quit %v result %q, want the first action run", m.quit, m.Result())
+	}
+	if got := a.calls[0].Ticked; len(got) != 2 {
+		t.Fatalf("action saw %d ticked rows, want 2", len(got))
 	}
 }
 
-func TestHotkeyWithReloadKeepsListFocus(t *testing.T) {
+func TestTabPicksWhichActionEnterRuns(t *testing.T) {
 	a := &acted{}
-	m := New(Config{
-		Columns:     []Column{{Title: "N"}},
-		Rows:        rows("a", "b"),
-		MultiSelect: true,
-		Reload:      func() ([]Row, error) { return rows("a", "b"), nil },
-		Actions:     []Action{{Label: "Del", Key: "ctrl+n", Run: a.run(Outcome{Status: "deleted"})}},
-	})
-	m = press(t, m, "ctrl+n", "enter")
-	if m.button != onList || len(a.calls) != 1 {
-		t.Fatalf("button %d calls %d, want the next enter to tick, not re-run", m.button, len(a.calls))
+	m := press(t, multiActions(a), "space", "tab", "enter")
+	if m.button != 1 || m.quit || m.status != "deleted" {
+		t.Fatalf("button %d quit %v status %q, want the second action run", m.button, m.quit, m.status)
 	}
-	eq(t, ticked(m), []string{"a"})
+	eq(t, ticked(m), []string{"a"}) // enter did not toggle
 }
 
-func TestHotkeyConfirmCancelReturnsToTheList(t *testing.T) {
-	for _, answer := range []string{"esc", "n", "enter"} { // enter answers No
-		a := &acted{}
-		m := New(Config{
-			Columns:     []Column{{Title: "N"}},
-			Rows:        rows("a", "b"),
-			MultiSelect: true,
-			Actions: []Action{{Label: "Del", Key: "ctrl+n",
-				Confirm: func(Selection) string { return "sure?" },
-				Run:     a.run(Outcome{Status: "deleted"})}},
-		})
-		m = press(t, m, "ctrl+n")
-		if !m.confirming {
-			t.Fatalf("%s: no prompt", answer)
-		}
-		m = press(t, m, answer)
-		if m.confirming || m.button != onList || len(a.calls) != 0 {
-			t.Fatalf("%s: confirming %v button %d calls %d, want back on the list", answer, m.confirming, m.button, len(a.calls))
-		}
-	}
-}
-
-func TestHotkeyConfirmYesReturnsToTheList(t *testing.T) {
+func TestHotkeyFocusesItsAction(t *testing.T) {
 	a := &acted{}
-	m := New(Config{
-		Columns:     []Column{{Title: "N"}},
-		Rows:        rows("a", "b"),
-		MultiSelect: true,
-		Actions: []Action{{Label: "Del", Key: "ctrl+n",
-			Confirm: func(Selection) string { return "sure?" },
-			Run:     a.run(Outcome{Status: "deleted"})}},
-	})
-	m = press(t, m, "ctrl+n", "y")
-	if m.button != onList || len(a.calls) != 1 {
-		t.Fatalf("button %d calls %d, want the action run and focus on the list", m.button, len(a.calls))
-	}
-}
-
-func TestHotkeyFromAFocusedButtonKeepsItFocused(t *testing.T) {
-	a := &acted{}
-	m := press(t, multiActions(a), "tab", "ctrl+n")
+	m := press(t, multiActions(a), "ctrl+n")
 	if m.button != 1 || len(a.calls) != 1 {
-		t.Fatalf("button %d calls %d, want the hotkey action focused", m.button, len(a.calls))
+		t.Fatalf("button %d calls %d, want the hotkey action run and focused", m.button, len(a.calls))
 	}
 }
 
-func TestMultiSelectWithoutActionsCannotFinishViaEnter(t *testing.T) {
-	m := press(t, multi(rows("a", "b")...), "enter", "enter")
-	if m.quit || m.Result() != "" {
-		t.Fatalf("quit %v result %q, want enter to only toggle", m.quit, m.Result())
-	}
-	if m = press(t, m, "esc"); !m.quit {
-		t.Fatal("esc did not cancel")
+func TestMultiSelectWithoutActionsEnterReturnsTheCursorKey(t *testing.T) {
+	m := press(t, multi(rows("a", "b")...), "space", "down", "enter")
+	if !m.quit || m.Result() != "b" {
+		t.Fatalf("quit %v result %q, want b", m.quit, m.Result())
 	}
 }

@@ -91,9 +91,17 @@ func (m Model) drawButton(label string, focused bool) string {
 const queryCursor = "▏"
 
 // queryLine is always on screen, so it is never a mystery why rows are
-// missing, and an empty one doubles as the hint that typing filters.
+// missing, and an empty one doubles as the hint that "/" filters. The cursor
+// is drawn only while filtering: it marks where typing goes, and outside the
+// query typing does not go there.
 func (m Model) queryLine() string {
 	prompt := m.styles.dim.Render("filter: ")
+	if !m.filtering {
+		if len(m.query) == 0 {
+			return prompt + m.styles.dim.Render("press / to filter")
+		}
+		return prompt + string(m.query)
+	}
 	if len(m.query) == 0 {
 		return prompt + queryCursor + m.styles.dim.Render("type to filter")
 	}
@@ -101,8 +109,8 @@ func (m Model) queryLine() string {
 }
 
 // keyHints advertises the shown actions that carry a hotkey. They matter
-// because the arrows belong to the query, so a hotkey is the only way to fire
-// an action without tabbing to its button first.
+// because a hotkey is the only way to fire an action without tabbing to its
+// button first.
 func (m Model) keyHints() []string {
 	var out []string
 	for _, i := range m.shownActions() {
@@ -123,28 +131,29 @@ func (m Model) hint() string {
 		// Only worth the space when there is somewhere to page to.
 		parts = append(parts, "[^e ^b] page")
 	}
+	if !m.filtering {
+		parts = append(parts, "[/] filter")
+	}
 	if m.cfg.MultiSelect {
-		if m.button == onList {
-			parts = append(parts, "[enter] toggle")
+		if !m.filtering {
+			parts = append(parts, "[space] toggle") // space types while filtering
 		}
 		parts = append(parts, "[^a] all", "[^x] none")
 	}
 	parts = append(parts, m.keyHints()...)
-	switch {
-	case m.cfg.MultiSelect && m.button == onList && len(m.shownActions()) > 0:
-		parts = append(parts, "[tab] buttons")
-	case m.cfg.MultiSelect && len(m.shownActions()) > 0:
-		parts = append(parts, "[tab] next button", "[shift+tab] back")
-	case len(m.cfg.Actions) > 1:
-		parts = append(parts, "[tab] next button")
+	if len(m.shownActions()) > 1 {
+		parts = append(parts, "[tab] next action")
 	}
-	if len(m.query) > 0 {
-		parts = append(parts, "[esc] clear filter", "[^w] delete word")
-	} else {
+	switch {
+	case m.filtering:
+		parts = append(parts, "[esc] done filtering", "[^w] delete word", "[^u] clear")
+	case len(m.query) > 0:
+		parts = append(parts, "[esc] clear filter")
+	default:
 		parts = append(parts, "[esc] quit")
 	}
-	if m.button != onList {
-		parts = append(parts, "[enter] go") // on the list, Enter ticks instead
+	if len(m.cfg.Actions) == 0 || len(m.shownActions()) > 0 {
+		parts = append(parts, "[enter] go")
 	}
 	return strings.Join(parts, "   ")
 }

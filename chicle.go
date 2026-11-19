@@ -29,7 +29,7 @@ type Row struct {
 	Ticked bool
 
 	// Locked rows are always ticked and can never be unticked — not by
-	// enter, and not by "select none". Use it for choices that are already
+	// space, and not by "select none". Use it for choices that are already
 	// committed elsewhere and must be undone deliberately.
 	Locked bool
 }
@@ -66,13 +66,14 @@ type Action struct {
 	// be focused first. Leave empty for actions only reachable via
 	// tab/shift+tab and Enter. If more than one Action shares a Key, the last
 	// one in the slice wins — chicle does not validate this at New or Run
-	// time, consistent with the rest of Config. Printable keys can never be a
-	// Key: they type into the query, so a Key like "x" never fires. Named keys
-	// such as "f1", "f2", "ctrl+n" and "alt+x" work. Avoid keys chicle already
-	// binds (up/down/left/right/home/end/enter/esc/tab/shift+tab/backspace,
-	// ctrl+c/ctrl+w/ctrl+u, ctrl+e/ctrl+f/ctrl+b/pgup/pgdown, space, and
-	// ctrl+a/ctrl+x under MultiSelect) — Key shadows them for this action
-	// rather than erroring.
+	// time, consistent with the rest of Config. A printable Key such as "d"
+	// fires from the list but not while filtering, where it types into the
+	// query instead; named keys such as "f2", "ctrl+n" and "alt+x" fire from
+	// both. Avoid keys chicle already binds (up/down/j/k, /, q, space, enter,
+	// esc, tab/shift+tab, ctrl+c, ctrl+e/ctrl+f/ctrl+b/pgup/pgdown, and
+	// ctrl+a/ctrl+x under MultiSelect; while filtering also
+	// left/right/home/end/backspace/ctrl+w/ctrl+u) — Key shadows them for this
+	// action rather than erroring.
 	// Pressing Key also moves button focus to this action so Confirm/Run
 	// behave exactly as Enter would; if a Confirm prompt is then cancelled,
 	// focus stays on this action rather than reverting to what was focused
@@ -107,8 +108,9 @@ type Config struct {
 	Rows    []Row
 
 	// Filter pre-fills the query, which the user can edit: the list opens
-	// narrowed with the query cursor at the end, so it can be refined, and
-	// Enter fires the focused action on whatever is left. Use it
+	// narrowed and already filtering, as though the user had pressed / and
+	// typed it, with the query cursor at the end so it can be refined. Enter
+	// fires the focused action on whatever is left. Use it
 	// to open on a guess -- the caller had a name in mind and wants it
 	// confirmed rather than assumed.
 	Filter string
@@ -118,15 +120,13 @@ type Config struct {
 	// the whole API for a plain "pick one thing" list.
 	Actions []Action
 
-	// MultiSelect turns on checkboxes: enter toggles the cursor row, so space
-	// is typed into the query as usual. ctrl+a ticks and ctrl+x unticks the
-	// rows the current filter shows (never the ones it hides, and never a
-	// locked row). Focus starts on the list; tab moves from the list to the
-	// buttons and shift+tab back, and enter runs a button only once it is
-	// focused (an Action.Key still fires from anywhere, and a hotkey fired
-	// from the list hands focus back to it). With no Actions there is nothing
-	// to focus, so enter only toggles: the picker can be cancelled with esc
-	// but not finished.
+	// MultiSelect turns on checkboxes: space toggles the cursor row (while
+	// filtering it types a space instead; esc leaves the query, keeping the
+	// filter, so space ticks again). ctrl+a ticks and ctrl+x unticks the rows
+	// the current filter shows (never the ones it hides, and never a locked
+	// row). Enter runs the highlighted action as it does without MultiSelect;
+	// with no Actions, Enter returns the cursor row's Key, so give a
+	// MultiSelect list an action that reads Selection.Ticked.
 	MultiSelect bool
 
 	// NoCycle stops the cursor at the ends of the list instead of wrapping

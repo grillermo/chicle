@@ -19,13 +19,12 @@ type Model struct {
 	quit   bool
 	result string
 
-	query []rune // the filter text, matched against every cell
-	qpos  int    // cursor position within query
+	filtering bool   // "/" was pressed: printable keys type into the query
+	query     []rune // the filter text, matched against every cell
+	qpos      int    // cursor position within query
 
-	button int    // focused action, or onList when focus is on the rows
+	button int    // focused action, an index into cfg.Actions
 	status string // message under the action row
-
-	backToList bool // a hotkey fired from the list; focus returns there after
 
 	confirming bool   // the prompt replaces the action row
 	confirmYes bool   // focus sits on No until the user moves it
@@ -45,18 +44,14 @@ func New(cfg Config) Model {
 	m.rows = append([]Row(nil), cfg.Rows...)
 	m = m.normaliseLocks()
 
-	// A pre-filled Filter opens the list exactly as typing it would leave it,
-	// cursor at the end: the caller is offering a guess, and the first thing
-	// the user may want is to correct it.
+	// A pre-filled Filter opens the list exactly as "/" and typing it would
+	// leave it, cursor at the end: the caller is offering a guess, and the
+	// first thing the user may want is to correct it.
 	if cfg.Filter != "" {
+		m.filtering = true
 		m.query = []rune(cfg.Filter)
 		m.qpos = len(m.query)
 		m = m.queryChanged()
-	}
-	// Enter ticks under MultiSelect, so focus starts on the rows; a button must
-	// be tabbed to before Enter runs it.
-	if cfg.MultiSelect {
-		m.button = onList
 	}
 	return m.clampButton()
 }
@@ -90,95 +85,106 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.applyUpdate(msg.rows), waitForUpdate(m.cfg.Updates)
 	case tea.KeyMsg:
-		s := msg.String()
-		if m.confirming {
-			next, done := m.updateConfirm(s)
-			if !next.confirming && next.backToList {
-				next.backToList = false
-				if !done {
-					next.button = onList
-				}
-			}
-			if done {
-				return next, tea.Quit
-			}
-			return next, nil
-		}
-		// Printable text goes to the query, so a bare rune is never a command.
-		// Alt+rune is not text: it falls through to the hotkeys, where it can
-		// match an Action.Key and is otherwise ignored.
+		next, cmd := m.updateKey(msg)
+		return next, cmd
+	}
+	return m, nil
+}
+
+// updateKey routes a keystroke: the confirm prompt has the keyboard while it
+// is up, then the query while filtering, then the list.
+func (m Model) updateKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	s := msg.String()
+	if m.confirming {
+		return quitIf(m.updateConfirm(s))
+	}
+	if m.filtering {
+		// Printable text, space included, goes to the query: terms are
+		// separated by spaces, so a space is part of what is being typed.
+		// Alt+rune is not text: it falls through to the hotkeys below.
 		if msg.Type == tea.KeyRunes && !msg.Alt {
 			return m.insertRunes(msg.Runes), nil
 		}
 		if msg.Type == tea.KeySpace {
 			return m.insertRunes([]rune{' '}), nil
 		}
-		// Hotkeys fire with a query set: an action revealed by the filter
-		// would otherwise be unreachable, and it exists to use the query.
-		// Plain runes were dealt with above, so only named and alt keys can match.
-		if i, ok := m.keyedAction(s); ok {
-			from := m.button
-			m.button = i
-			next, done := m.activate()
-			// A hotkey fired from the list is a one-off: put focus back so the
-			// next Enter ticks rather than re-running the action. A pending
-			// prompt defers that until it is answered.
-			if from == onList && !done {
-				if next.confirming {
-					next.backToList = true
-				} else {
-					next.button = onList
-				}
-			}
-			if done {
-				return next, tea.Quit
-			}
-			return next, nil
+	}
+	// Hotkeys fire while filtering too: an action revealed by the filter would
+	// otherwise be unreachable, and it exists to use the query. Plain runes
+	// were taken above while filtering, so only named and alt keys match there.
+	if i, ok := m.keyedAction(s); ok {
+		m.button = i
+		return quitIf(m.activate())
+	}
+	switch s {
+	case "ctrl+c":
+		m.quit = true
+		return m, tea.Quit
+	case "tab":
+		return m.moveButton(1), nil
+	case "shift+tab":
+		return m.moveButton(-1), nil
+	case "enter":
+		return quitIf(m.activate())
+	case "up":
+		return m.move(-1).scrollToCursor(), nil
+	case "down":
+		return m.move(1).scrollToCursor(), nil
+	case "ctrl+e", "ctrl+f", "pgdown":
+		return m.page(1), nil
+	case "ctrl+b", "pgup":
+		return m.page(-1), nil
+	case "ctrl+a":
+		if m.cfg.MultiSelect {
+			return m.setAll(true), nil
 		}
-		switch s {
-		case "ctrl+c":
-			m.quit = true
-			return m, tea.Quit
-		case "esc":
-			// A filter on screen is cleared first: quitting and losing the
-			// query to the same keystroke is never what was meant.
-			if len(m.query) > 0 {
-				return m.clearFilter(), nil
-			}
-			m.quit = true
-			return m, tea.Quit
-		case "tab":
-			return m.moveButton(1), nil
-		case "shift+tab":
-			return m.moveButton(-1), nil
-		case "enter":
-			if m.button == onList {
-				return m.toggleCursor(), nil
-			}
-			next, done := m.activate()
-			if done {
-				return next, tea.Quit
-			}
-			return next, nil
-		case "ctrl+a":
-			if m.cfg.MultiSelect {
-				return m.setAll(true), nil
-			}
-		case "ctrl+x":
-			if m.cfg.MultiSelect {
-				return m.setAll(false), nil
-			}
-		case "up":
-			return m.move(-1).scrollToCursor(), nil
-		case "down":
-			return m.move(1).scrollToCursor(), nil
-		case "ctrl+e", "ctrl+f", "pgdown":
-			return m.page(1), nil
-		case "ctrl+b", "pgup":
-			return m.page(-1), nil
-		default:
-			return m.editQuery(s), nil
+		return m, nil
+	case "ctrl+x":
+		if m.cfg.MultiSelect {
+			return m.setAll(false), nil
 		}
+		return m, nil
+	}
+	if m.filtering {
+		if s == "esc" {
+			// Leave the query, keep the filter: the narrowed list is what
+			// the user searched for, and now wants to tick or act on.
+			m.filtering = false
+			return m, nil
+		}
+		return m.editQuery(s), nil
+	}
+	switch s {
+	case "/":
+		m.filtering = true
+		m.qpos = len(m.query)
+	case "j":
+		return m.move(1).scrollToCursor(), nil
+	case "k":
+		return m.move(-1).scrollToCursor(), nil
+	case " ", "space":
+		if m.cfg.MultiSelect {
+			return m.toggleCursor(), nil
+		}
+	case "esc":
+		// A filter on screen is cleared first: quitting and losing the
+		// query to the same keystroke is never what was meant.
+		if len(m.query) > 0 {
+			return m.clearFilter(), nil
+		}
+		m.quit = true
+		return m, tea.Quit
+	case "q":
+		m.quit = true
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// quitIf turns an action's "done" into Bubble Tea's quit command.
+func quitIf(m Model, done bool) (Model, tea.Cmd) {
+	if done {
+		return m, tea.Quit
 	}
 	return m, nil
 }

@@ -53,7 +53,7 @@ func TestNoSectionsDrawsNoHeadings(t *testing.T) {
 }
 
 func TestFilteringAwayASectionDropsItsHeading(t *testing.T) {
-	m := press(t, sectioned(), "c")
+	m := press(t, sectioned(), "/", "c")
 	if got := m.headingLines(); got != 0 {
 		t.Fatalf("headings take %d lines, want 0 — only one section survives the filter", got)
 	}

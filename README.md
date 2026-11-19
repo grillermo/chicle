@@ -13,16 +13,17 @@ inside command substitution: `sel=$(mypicker)`. Built on
 
 - **Plain single-select lists** in a few lines. With no actions configured,
   Enter returns the cursor row's `Key`.
-- **Filtering**: just type. Terms are case-insensitive and ANDed, and each can
-  match any cell, so `web prod` narrows twice. The query line supports
-  `←` `→`, `home`, `end`, `backspace`, `ctrl+w` and `ctrl+u`.
+- **Filtering**: press `/` and type. Terms are case-insensitive and ANDed, and
+  each can match any cell, so `web prod` narrows twice. The query line
+  supports `←` `→`, `home`, `end`, `backspace`, `ctrl+w` and `ctrl+u`.
 - **Pre-filled filter**: open the list already narrowed to a guess, with the
   query editable so the user can correct it.
 - **Multi-select** with checkboxes, select all and select none, plus **locked**
   rows that stay ticked.
 - **Section headings** that group adjacent rows. The cursor skips headings.
-- **Action buttons** under the list, each with an optional hotkey, an optional
-  confirmation prompt and an optional `Show` condition that hides it.
+- **Action buttons** under the list: `tab` picks one, `enter` runs it. Each has
+  an optional hotkey, an optional confirmation prompt and an optional `Show`
+  condition that hides it.
 - **Actions on the filter text** (`OnEmpty` + `Selection.Filter`) for
   "none of these, use what I typed".
 - **Reload** after an action that keeps the picker open. The filter is kept.
@@ -128,12 +129,12 @@ chicle.Config{
 - `Done: false` keeps the list open, shows `Status` under the buttons, and
   calls `Config.Reload` if it's set. If the list ends up empty, the picker
   closes.
-- `Key` fires the action right away, even with a query typed. It must be a
-  named key such as `ctrl+d`, `f2` or `alt+x`: printable keys type into the
-  query, so a `Key` like `"d"` never fires. Don't use keys chicle already
-  binds (see [Keys](#keys)): an action's `Key` takes over that key instead of
-  raising an error. If two actions share a `Key`, the last one
-  wins.
+- `Key` fires the action right away. A named key such as `ctrl+d`, `f2` or
+  `alt+x` fires even while filtering; a printable key like `"d"` fires from
+  the list only, because while filtering it types into the query. Don't use
+  keys chicle already binds (see [Keys](#keys)): an action's `Key` takes over
+  that key instead of raising an error. If two actions share a `Key`, the
+  last one wins.
 - `Show` hides the action, including its hotkey, whenever it returns false.
 - `OnEmpty` lets the action run when the filter matches no rows. Use it with
   `Selection.Filter`:
@@ -165,15 +166,15 @@ chicle.Config{
 ```
 
 `Selection.Ticked` holds every ticked row. `Locked` rows are always ticked and
-can't be unticked. `enter` toggles the row under the cursor, so `space` types
-into the query as usual. `ctrl+a` ticks and `ctrl+x` unticks the rows the
-current filter shows; rows it hides keep their ticks, and locked rows stay
-ticked.
+can't be unticked. `space` toggles the row under the cursor. `ctrl+a` ticks
+and `ctrl+x` unticks the rows the current filter shows; rows it hides keep
+their ticks, and locked rows stay ticked.
 
-Because `enter` ticks, focus starts on the list with no button highlighted.
-`tab` moves from the list to the first button and on through the rest;
-`shift+tab` moves back, stopping at the list. With a button focused, `enter`
-runs it. An action's `Key` still fires from anywhere.
+`enter` runs the highlighted action, and `tab` moves the highlight to the next
+one. While filtering, `space` types a space; press `esc` to go back to the
+list with the filter kept, and `space` ticks again. With no actions, `enter`
+returns the cursor row's `Key`, so a multi-select list needs an action to hand
+back its ticks.
 
 Without `MultiSelect`, `Ticked` holds only the cursor row, so the same `Run`
 works for both kinds of list.
@@ -190,8 +191,9 @@ headings are drawn when every visible row is in the same section.
 chicle.Config{Filter: "prod", /* ... */}
 ```
 
-The list opens with `prod` already in the query, narrowed to matching rows.
-The user can edit it like any typed text.
+The list opens with `prod` already in the query, narrowed to matching rows and
+in filter mode, as if the user had pressed `/` and typed it. They can edit it
+like any typed text.
 
 ### Slow columns
 
@@ -218,27 +220,41 @@ The cursor stays on the row it was on (matched by `Key`), and ticks are kept.
 
 ## Keys
 
-Printable keys type straight into the query; there is no separate filter mode.
+The list starts in list mode. `/` switches to filter mode, where printable
+keys type into the query.
 
-| Key                        | Does                                              |
-| -------------------------- | ------------------------------------------------- |
-| any printable character    | Insert into the query at the cursor               |
-| `space`                    | Insert a space into the query                     |
-| `↑` `↓`                    | Move the row cursor                               |
-| `ctrl+e`, `ctrl+f`, `pgdn` | Page down                                         |
-| `ctrl+b`, `pgup`           | Page up                                           |
-| `←` `→`                    | Move the query cursor                             |
-| `home` / `end`             | Query cursor to start / end                       |
-| `backspace`                | Delete a character                                |
-| `ctrl+w` / `ctrl+u`        | Delete a word / the whole query                   |
-| `tab` / `shift+tab`        | Next / previous button (`MultiSelect`: list first) |
-| `enter`                    | Run focused action / pick; tick on a focused `MultiSelect` list |
-| `esc`                      | Clear the query if there is one, else quit        |
-| `ctrl+c`                   | Quit                                              |
-| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick / untick all visible rows      |
+| Key                        | List                                   | While filtering                    |
+| -------------------------- | -------------------------------------- | ---------------------------------- |
+| `↑` `↓`                    | Move the row cursor                    | Move the row cursor                |
+| `j` `k`                    | Move the row cursor                    | Type                               |
+| `ctrl+e`, `ctrl+f`, `pgdn` | Page down                              | Page down                          |
+| `ctrl+b`, `pgup`           | Page up                                | Page up                            |
+| `/`                        | Start filtering                        | Type `/`                           |
+| `space`                    | `MultiSelect`: tick / untick the row   | Type a space                       |
+| `tab` / `shift+tab`        | Highlight the next / previous action   | Same                               |
+| `enter`                    | Run the highlighted action, or pick    | Same                               |
+| `esc`                      | Clear the filter if there is one, else quit | Back to the list, keeping the filter |
+| `q`                        | Quit                                   | Type `q`                           |
+| `ctrl+c`                   | Quit                                   | Quit                               |
+| `ctrl+a` / `ctrl+x`        | `MultiSelect`: tick / untick all visible rows | Same                        |
+| `←` `→`, `home` / `end`    |                                        | Move the query cursor              |
+| `backspace`                |                                        | Delete a character                 |
+| `ctrl+w` / `ctrl+u`        |                                        | Delete a word / the whole query    |
 
 In a confirmation prompt, `←`/`y` means yes and `→`/`n` means no. `enter`
 answers and `esc` cancels. The prompt starts on **No**.
+
+## Upgrading to v0.5.0
+
+Breaking change: filtering is behind `/` again. Typing on the list no longer
+filters; `j`/`k` move, `q` quits, and printable `Action.Key`s such as `"d"`
+fire again (from the list, not while filtering). In filter mode, `esc` returns
+to the list with the filter kept; on the list, `esc` clears it, then quits.
+
+Under `MultiSelect`, `space` toggles the cursor row and `enter` runs the
+highlighted action. There is no separate list focus any more: an action is
+always highlighted, and `tab` / `shift+tab` cycle through them, wrapping at
+the ends.
 
 ## Upgrading to v0.4.0
 
@@ -248,10 +264,6 @@ Quit with `esc` (when the query is empty) or `ctrl+c`; tick all and none are
 `ctrl+a` and `ctrl+x`; move between buttons with `tab` and `shift+tab`. An
 `Action.Key` that is a printable character never fires, so switch it to a
 named key such as `ctrl+d` or `ctrl+n`.
-
-Under `MultiSelect`, `enter` toggles the cursor row and `space` types into the
-query like anywhere else. Focus starts on the list; `tab` reaches the buttons,
-and `ctrl+a`/`ctrl+x` only touch visible rows.
 
 ## Testing
 
